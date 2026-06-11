@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
 import api from '../../utils/api.js';
@@ -37,6 +37,8 @@ const Cart = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [summaryOffset, setSummaryOffset] = useState(0);
+  const [searchParams] = useSearchParams();
+  const focusedProductId = searchParams.get('focus') || '';
   const cartGuideRef = useRef(null);
   const summaryRef = useRef(null);
   const { isAuthenticated, isLoading: authLoading, logout } = useAuth();
@@ -101,6 +103,38 @@ const Cart = () => {
 
     fetchCart();
   }, [authLoading, isAuthenticated, logout]);
+
+  useEffect(() => {
+    if (!focusedProductId || !cart?.items?.length) return;
+
+    let timerId = null;
+    let clearTimerId = null;
+
+    const focusRow = () => {
+      const row = document.getElementById(`cart-item-${focusedProductId}`);
+      if (!row) return false;
+
+      row.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      row.classList.add('cart-table__row--focused');
+
+      clearTimerId = window.setTimeout(() => {
+        row.classList.remove('cart-table__row--focused');
+      }, 4200);
+
+      return true;
+    };
+
+    if (!focusRow()) {
+      timerId = window.setTimeout(focusRow, 350);
+    } else {
+      timerId = window.setTimeout(focusRow, 900);
+    }
+
+    return () => {
+      if (timerId) window.clearTimeout(timerId);
+      if (clearTimerId) window.clearTimeout(clearTimerId);
+    };
+  }, [focusedProductId, cart?.items]);
 
   /**
    * Update item quantity (with optimistic UI)
@@ -383,7 +417,11 @@ const Cart = () => {
             </thead>
             <tbody>
               {cart.items.map((item) => (
-                <tr key={item.productId}>
+                <tr
+                  key={item.productId}
+                  id={`cart-item-${item.productId}`}
+                  className={String(item.productId) === String(focusedProductId) ? 'cart-table__row--focused' : ''}
+                >
                   {/* FIELD: name (from backend cart response) */}
                   <td data-label="Product">{item.name}</td>
 
@@ -393,34 +431,33 @@ const Cart = () => {
 
                   {/* FIELD: quantity (editable via handleQuantityChange) */}
                   <td data-label="Quantity">
-                    <input
-                      type="number"
-                      min="0"
-                      value={item.quantity}
-                      onChange={(e) => handleQuantityChange(item.productId, e.target.value)}
-                      className="cart-quantity-input"
-                      style={{
-                        width: '58px',
-                        padding: '0.32rem 0.2rem',
-                        border: '1px solid #d6dee9',
-                        borderRadius: '6px',
-                        backgroundColor: '#fff',
-                        transition: 'box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease',
-                        cursor: 'text',
-                        fontSize: '0.88rem',
-                        textAlign: 'center'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.backgroundColor = '#fff';
-                        e.target.style.borderColor = '#5b4b8a';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(91, 75, 138, 0.12)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.backgroundColor = '#fff';
-                        e.target.style.borderColor = '#d6dee9';
-                        e.target.style.boxShadow = 'none';
-                      }}
-                    />
+                    <div className="cart-quantity-stepper" aria-label={`Quantity for ${item.name}`}>
+                      <button
+                        type="button"
+                        onClick={() => handleQuantityChange(item.productId, Math.max(0, Number(item.quantity || 0) - 1))}
+                        aria-label={`Decrease ${item.name} quantity`}
+                      >
+                        <span aria-hidden="true">-</span>
+                      </button>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={item.quantity}
+                        onChange={(e) => handleQuantityChange(item.productId, e.target.value)}
+                        onFocus={(e) => e.target.select()}
+                        onClick={(e) => e.target.select()}
+                        className="cart-quantity-input"
+                        aria-label={`Quantity for ${item.name}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleQuantityChange(item.productId, Number(item.quantity || 0) + 1)}
+                        aria-label={`Increase ${item.name} quantity`}
+                      >
+                        <span aria-hidden="true">+</span>
+                      </button>
+                    </div>
                   </td>
 
                   {/* FIELD: subtotal (from backend - NEVER calculate on frontend) */}

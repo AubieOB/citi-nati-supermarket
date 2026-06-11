@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -371,46 +371,37 @@ const CheckoutContent = () => {
 
         {/* 🔒 Out-of-Stock Alert */}
         {outOfStockItems.length > 0 && (
-          <div style={{
-            backgroundColor: '#fff3cd',
-            color: '#856404',
-            padding: '1.5rem',
-            borderRadius: '4px',
-            marginBottom: '1.5rem',
-            borderLeft: '4px solid #ffc107',
-          }}>
-            <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1rem' }}>
-              <i className="fas fa-exclamation-triangle" style={{marginRight: '0.5rem', color: '#ff9800'}}></i>
-              Stock Check Failed
-            </h3>
-            <div style={{ marginBottom: '1rem' }}>
-              <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem' }}>
-                The following items are not fully available:
-              </p>
+          <div className="checkout-stock-alert">
+            <div className="checkout-stock-alert__header">
+              <span className="checkout-stock-alert__icon">
+                <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>
+              </span>
+              <div>
+                <h3>Stock needs a quick update</h3>
+                <p>Some items in your cart need adjustment before checkout can continue.</p>
+              </div>
+            </div>
+            <div className="checkout-stock-alert__items">
               {outOfStockItems.map((item, idx) => (
-                <div key={idx} style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.5)',
-                  padding: '0.75rem',
-                  marginBottom: idx < outOfStockItems.length - 1 ? '0.5rem' : 0,
-                  borderRadius: '4px',
-                  borderLeft: '3px solid #ff6b6b',
-                }}>
-                  <p style={{ margin: '0 0 0.25rem 0', fontWeight: '600' }}>
-                    {item.name}
-                  </p>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#333' }}>
-                    {item.reason === 'Insufficient stock'
-                      ? `You requested ${item.quantity}, but only ${item.availableStock} available`
-                      : `Product not found in stock`
-                    }
-                  </p>
+                <div key={idx} className="checkout-stock-alert__item">
+                  <div>
+                    <strong>{item.name}</strong>
+                    <span>
+                      {item.reason === 'Insufficient stock'
+                        ? `Requested ${item.quantity}; available ${item.availableStock}`
+                        : 'This product is not currently available'
+                      }
+                    </span>
+                  </div>
+                  <Link
+                    to={`/cart?focus=${encodeURIComponent(item.productId || item.id || '')}#cart-item-${encodeURIComponent(item.productId || item.id || '')}`}
+                    className="checkout-stock-alert__button"
+                  >
+                    Fix in cart
+                  </Link>
                 </div>
               ))}
             </div>
-            <p style={{ margin: '1rem 0 0 0', fontSize: '0.85rem', color: '#666' }}>
-              <i className="fas fa-info-circle" style={{marginRight: '0.5rem'}}></i>
-              Please update your cart and try again
-            </p>
           </div>
         )}
 

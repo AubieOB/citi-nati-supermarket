@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -57,10 +57,11 @@ const heroSlides = [
 const Home = () => {
   const [activeSlide, setActiveSlide] = useState(0);
   const [featuredProducts, setFeaturedProducts] = useState([]);
-  const [addingProductId, setAddingProductId] = useState(null);
+  const [addedProductId, setAddedProductId] = useState(null);
+  const addedFeedbackTimerRef = useRef(null);
   const { isAuthenticated, logout } = useAuth();
   const { updateCartCount } = useCart();
-  const { modal, closeModal, showError, showSuccess } = useModal();
+  const { modal, closeModal, showError } = useModal();
 
   const trackProductInteraction = (product, action) => {
     if (!product?.id) return;
@@ -95,10 +96,15 @@ const Home = () => {
     }
 
     try {
-      setAddingProductId(product.id);
+      setAddedProductId(product.id);
+      if (addedFeedbackTimerRef.current) {
+        window.clearTimeout(addedFeedbackTimerRef.current);
+      }
       await api.post('/cart', { productId: product.id, quantity: 1 });
       trackProductInteraction(product, 'add_to_cart');
-      showSuccess('Added to Cart', `${product.name} added to cart!`);
+      addedFeedbackTimerRef.current = window.setTimeout(() => {
+        setAddedProductId(null);
+      }, 1600);
       await updateCartCount();
     } catch (err) {
       if (err.response?.status === 401) {
@@ -107,8 +113,6 @@ const Home = () => {
         return;
       }
       showError('Error', `Error adding to cart: ${err.response?.data?.error || 'Unknown error'}`);
-    } finally {
-      setAddingProductId(null);
     }
   };
 
@@ -159,6 +163,14 @@ const Home = () => {
     // Run both operations on component mount
     warmupBackend();
     prefetchProducts();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (addedFeedbackTimerRef.current) {
+        window.clearTimeout(addedFeedbackTimerRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -296,7 +308,7 @@ const Home = () => {
               {featuredProducts.map((product) => {
                 const price = Number(product.finalPrice || product.price || 0);
                 const availableStock = resolveEffectiveStock(product);
-                const isAdding = addingProductId === product.id;
+                const wasAdded = addedProductId === product.id;
                 const stockLabel = availableStock > 0 ? `In stock (${availableStock})` : 'Out of stock';
                 return (
                   <article key={product.id} className="home-featured-product">
@@ -324,13 +336,13 @@ const Home = () => {
                       <em>{formatMWK(price)}</em>
                       <button
                         type="button"
-                        className="home-featured-product__cart"
+                        className={`home-featured-product__cart${wasAdded ? ' is-added' : ''}`}
                         onClick={() => handleAddFeaturedToCart(product)}
-                        disabled={availableStock <= 0 || isAdding}
+                        disabled={availableStock <= 0}
                         aria-label={`Add ${product.name} to cart`}
                         title={availableStock > 0 ? 'Add to cart' : 'Out of stock'}
                       >
-                        <i className={`fas ${isAdding ? 'fa-spinner fa-spin' : 'fa-cart-plus'}`} aria-hidden="true"></i>
+                        <i className={`fas ${wasAdded ? 'fa-check' : 'fa-cart-plus'}`} aria-hidden="true"></i>
                       </button>
                     </div>
                   </article>

@@ -75,9 +75,12 @@ const Products = () => {
   const [totalSystemProducts, setTotalSystemProducts] = useState(0);
   const [scrollY, setScrollY] = useState(0);
   const [showAccountPopup, setShowAccountPopup] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [addedProductId, setAddedProductId] = useState(null);
   const { isAuthenticated, logout, user } = useAuth();
   const { cartCount, updateCartCount } = useCart();
-  const { modal, closeModal, showError, showSuccess, showConfirm } = useModal();
+  const { modal, closeModal, showError, showConfirm } = useModal();
   const navigate = useNavigate();
   
   // Refs for predictive search with caching and cancellation
@@ -93,6 +96,7 @@ const Products = () => {
   const selectedCategorySearchRef = useRef(''); // Keep category for search callback
   const onSaleOnlyRef = useRef(false); // Keep sale filter for search callback
   const searchQueryRef = useRef('');
+  const addedFeedbackTimerRef = useRef(null);
 
   // Filter state from URL params (category and promotion only, not search)
   const selectedCategory = searchParams.get('category') || '';
@@ -387,6 +391,9 @@ const Products = () => {
       }
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
+      }
+      if (addedFeedbackTimerRef.current) {
+        clearTimeout(addedFeedbackTimerRef.current);
       }
     };
   }, []);
@@ -792,13 +799,14 @@ const Products = () => {
   /**
    * Handle Add to Cart
    */
-  const handleAddToCart = async (product) => {
+  const handleAddToCart = async (product, quantity = 1) => {
     if (!isAuthenticated) {
       showError('Authentication Required', 'Please log in to add items to your cart');
       return;
     }
 
     const availableStock = getEffectiveStock(product);
+    const requestedQuantity = Math.max(1, Math.min(Number(quantity) || 1, availableStock || 1));
 
     if (availableStock <= 0) {
       showError('Out of Stock', `${product.name} is out of stock`);
@@ -808,7 +816,7 @@ const Products = () => {
     try {
       const validation = cartValidation.validateAddToCart({
         productId: product.id,
-        quantity: 1
+        quantity: requestedQuantity
       });
 
       if (!validation.isValid) {
@@ -819,7 +827,7 @@ const Products = () => {
       // Use finalPrice from backend (already calculated considering discount)
       const response = await api.post('/cart', {
         productId: product.id,
-        quantity: 1
+        quantity: requestedQuantity
       });
 
       api.post('/products/interactions', {
@@ -830,7 +838,13 @@ const Products = () => {
         locationCode: STOREFRONT_LOCATION_CODE,
       }).catch(() => {});
 
-      showSuccess('Added to Cart', `${product.name} added to cart!`);
+      if (addedFeedbackTimerRef.current) {
+        clearTimeout(addedFeedbackTimerRef.current);
+      }
+      setAddedProductId(product.id);
+      addedFeedbackTimerRef.current = setTimeout(() => {
+        setAddedProductId(null);
+      }, 1600);
       await updateCartCount();
     } catch (err) {
       if (err.response?.status === 401) {
@@ -1250,7 +1264,25 @@ const Products = () => {
                 const hasValidDiscount = discountPercent > 0;
 
                 return (
-                  <div key={product.id} className="product-card" style={{ position: 'relative' }}>
+                  <div
+                    key={product.id}
+                    className="product-card"
+                    style={{ position: 'relative' }}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setSelectedProduct(product);
+                      setSelectedQuantity(1);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setSelectedQuantity(1);
+                        setSelectedProduct(product);
+                      }
+                    }}
+                    aria-label={`View details for ${product.name}`}
+                  >
                     {/* Sale Badge */}
                     {hasValidDiscount && (
                       <div className="product-card__badge" style={{
@@ -1309,7 +1341,7 @@ const Products = () => {
                       </p>
 
                       {/* Pricing Section */}
-                      <div style={{ marginBottom: '1rem' }}>
+                      <div className="product-card__price-block" style={{ marginBottom: '1rem' }}>
                         {hasValidDiscount ? (
                           <div>
                             {/* Original Price (Crossed Out) */}
@@ -1335,7 +1367,7 @@ const Products = () => {
                       </div>
 
                       {/* Stock Status */}
-                      <div className="product-card__stock" style={{
+                      <div className={availableStock > 0 ? 'product-card__stock' : 'product-card__stock product-card__stock--out'} style={{
                         fontSize: '0.85rem',
                         color: availableStock > 0 ? '#28a745' : '#dc3545',
                         marginBottom: '1rem'
@@ -1345,8 +1377,11 @@ const Products = () => {
 
                       {/* Add to Cart */}
                       <button
-                        className="product-card__button product-card__button--icon"
-                        onClick={() => handleAddToCart(product)}
+                        className={`product-card__button product-card__button--icon ${addedProductId === product.id ? 'is-added' : ''}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleAddToCart(product);
+                        }}
                         disabled={availableStock <= 0}
                         aria-label={availableStock > 0 ? `Add ${product.name} to cart` : `${product.name} is out of stock`}
                         title={availableStock > 0 ? 'Add to cart' : 'Out of stock'}
@@ -1355,7 +1390,7 @@ const Products = () => {
                           cursor: availableStock <= 0 ? 'not-allowed' : 'pointer'
                         }}
                       >
-                        <i className={`fas ${availableStock > 0 ? 'fa-cart-plus' : 'fa-ban'}`} aria-hidden="true"></i>
+                        <i className={`fas ${addedProductId === product.id ? 'fa-check' : availableStock > 0 ? 'fa-cart-plus' : 'fa-ban'}`} aria-hidden="true"></i>
                       </button>
                     </div>
                   </div>
@@ -1466,6 +1501,109 @@ const Products = () => {
           <i className="fas fa-arrow-up"></i>
         </button>
       )}
+
+      {selectedProduct && (() => {
+        const availableStock = getEffectiveStock(selectedProduct);
+        const originalPrice = Number(selectedProduct.originalPrice || 0);
+        const finalPrice = Number(selectedProduct.finalPrice || selectedProduct.price || 0);
+        const modalQuantity = Math.max(1, Math.min(Number(selectedQuantity) || 1, availableStock || 1));
+        const modalSubtotal = finalPrice * modalQuantity;
+        const discountPercent = selectedProduct.isOnSale && originalPrice > 0 && finalPrice > 0 && finalPrice < originalPrice
+          ? calculateDiscount(originalPrice, finalPrice)
+          : 0;
+
+        return (
+          <div className="product-quick-view-overlay" role="presentation" onClick={() => setSelectedProduct(null)}>
+            <section
+              className="product-quick-view"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Product details for ${selectedProduct.name}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="product-quick-view__close"
+                onClick={() => setSelectedProduct(null)}
+                aria-label="Close product details"
+              >
+                <i className="fas fa-times" aria-hidden="true"></i>
+              </button>
+
+              <div className="product-quick-view__image">
+                {selectedProduct.imageUrl ? (
+                  <img src={selectedProduct.imageUrl} alt={selectedProduct.name} crossOrigin="anonymous" />
+                ) : (
+                  <i className="fas fa-basket-shopping" aria-hidden="true"></i>
+                )}
+              </div>
+
+              <div className="product-quick-view__content">
+                <span className="product-quick-view__category">{selectedProduct.category || 'Product'}</span>
+                <h2>{selectedProduct.name}</h2>
+                <div className="product-quick-view__price-row">
+                  {discountPercent > 0 && <span className="product-quick-view__old-price">{formatMWK(originalPrice)}</span>}
+                  <strong>{formatMWK(finalPrice)}</strong>
+                  {discountPercent > 0 && <em>{discountPercent}% off</em>}
+                </div>
+                <p className={availableStock > 0 ? 'product-quick-view__stock' : 'product-quick-view__stock product-quick-view__stock--out'}>
+                  {availableStock > 0 ? `In stock (${availableStock} available)` : 'Out of stock'}
+                </p>
+                <p className="product-quick-view__note">
+                  A smart pick for your next shop. Choose the quantity you need and add it to your cart in one step.
+                </p>
+                <div className="product-quick-view__quantity-row">
+                  <span>Quantity:</span>
+                  <div className="product-quick-view__stepper" aria-label={`Quantity for ${selectedProduct.name}`}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedQuantity((value) => Math.max(1, Number(value || 1) - 1))}
+                      disabled={modalQuantity <= 1}
+                      aria-label={`Decrease ${selectedProduct.name} quantity`}
+                    >
+                      <i className="fas fa-minus" aria-hidden="true"></i>
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      max={Math.max(1, availableStock)}
+                      value={modalQuantity}
+                      onChange={(event) => {
+                        const nextQuantity = Number(event.target.value || 1);
+                        setSelectedQuantity(Math.max(1, Math.min(nextQuantity, availableStock || 1)));
+                      }}
+                      aria-label={`Quantity for ${selectedProduct.name}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setSelectedQuantity((value) => Math.min(availableStock, Number(value || 1) + 1))}
+                      disabled={availableStock <= 0 || modalQuantity >= availableStock}
+                      aria-label={`Increase ${selectedProduct.name} quantity`}
+                    >
+                      <i className="fas fa-plus" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                </div>
+                <div className="product-quick-view__subtotal">
+                  <span>Subtotal:</span>
+                  <strong>{formatMWK(modalSubtotal)}</strong>
+                </div>
+                <Button
+                  className={addedProductId === selectedProduct.id ? 'product-quick-view__add-button is-added' : 'product-quick-view__add-button'}
+                  variant="primary"
+                  size="large"
+                  onClick={() => handleAddToCart(selectedProduct, modalQuantity)}
+                  disabled={availableStock <= 0}
+                  style={{ width: '100%' }}
+                >
+                  <i className={`fas ${addedProductId === selectedProduct.id ? 'fa-check' : 'fa-cart-plus'}`} style={{ marginRight: '0.5rem' }} aria-hidden="true"></i>
+                  {availableStock <= 0 ? 'Out of Stock' : addedProductId === selectedProduct.id ? 'Added to cart!' : 'Add to Cart'}
+                </Button>
+              </div>
+            </section>
+          </div>
+        );
+      })()}
       
       <Modal
         isOpen={modal.isOpen}

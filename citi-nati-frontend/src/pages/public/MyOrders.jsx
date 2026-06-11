@@ -394,8 +394,10 @@ const MyOrdersContent = () => {
               .brand { display:flex; align-items:center; }
               .brand img { width:325px; height:auto; max-height:48px; object-fit:contain; object-position:left center; }
               .receipt-subtitle { margin: 5px 0 0; color:#334155; font-size: 11px; font-weight:550; letter-spacing:.07em; text-transform:uppercase; }
-              .stamp { margin-top: 8px; color: var(--green); font-size: 27px; line-height: 1; font-family: "Courier New", monospace; font-weight: 650; letter-spacing: .06em; }
+              .stamp { margin: 8px 0 0; color: var(--green); font-size: 25px; line-height: 1; font-family: "Courier New", monospace; font-weight: 650; letter-spacing: .06em; white-space:nowrap; }
+              .stamp--mobile { display:none; }
               .receipt-title { margin: 23px 0 26px; padding-bottom: 22px; border-bottom: 1px solid #e5e7eb; font-size: 25px; font-weight: 500; }
+              .receipt-rule { display:none; margin: 0 0 26px; border:0; border-top: 1px solid #e5e7eb; }
               .info-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 42px; margin-bottom: 20px; }
               .info-block.right { text-align:right; }
               .info-heading { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
@@ -435,32 +437,36 @@ const MyOrdersContent = () => {
               .back-strip a { color:#0067a8; font-size:18px; text-decoration:none; }
               .back-strip a:hover { text-decoration:underline; }
               .muted { color: var(--muted); }
-              @media screen and (max-width: 760px) {
-                html, body { overflow-x:hidden; }
-                .viewer { padding: 14px 0 28px; overflow-x:hidden; }
+              @media screen and (max-width: 900px) {
+                html, body { width:100%; margin:0; overflow-x:hidden; background:#fff; }
+                .viewer { width:100%; padding: 0 0 18px; overflow-x:hidden; background:#fff; }
                 .paper-frame {
-                  width: 210mm;
-                  min-height: calc(297mm * var(--receipt-scale, 1));
-                  margin: 0 auto;
-                  display:flex;
-                  justify-content:center;
-                  align-items:flex-start;
+                  width: 100%;
+                  max-width: 100%;
+                  min-height: 0;
+                  margin: 0;
+                  display:block;
+                  overflow: visible;
                 }
                 .paper {
-                  width: 210mm;
-                  min-height: 297mm;
-                  max-width: none;
-                  padding: 22mm 23mm 17mm;
+                  width: 100%;
+                  min-height: auto;
+                  max-width: 100%;
+                  margin:0;
+                  padding: 18px 10px 22px;
+                  border:0;
+                  box-shadow:none;
                   overflow:hidden;
-                  transform: scale(var(--receipt-scale, 1));
-                  transform-origin: top center;
+                  transform:none;
                 }
-                .top { align-items:center; gap:10px; }
-                .brand img { width:325px; max-height:48px; }
-                .stamp { font-size:22px; white-space:nowrap; }
-                .receipt-title { margin:18px 0 18px; padding-bottom:16px; font-size:24px; }
-                .info-grid { grid-template-columns: minmax(0, 1fr) minmax(0, .82fr); gap:16px; }
-                .info-block.right { text-align:right; }
+                .top { align-items:center; justify-content:flex-start; gap:10px; }
+                .brand img { width:min(325px, 86vw); max-height:48px; }
+                .stamp--desktop { display:none; }
+                .stamp--mobile { display:block; margin:-6px 0 16px; font-size:20px; white-space:nowrap; }
+                .receipt-title { margin:18px 0 12px; padding-bottom:0; font-size:24px; }
+                .receipt-rule { display:block; margin-bottom:18px; }
+                .info-grid { grid-template-columns: 1fr; gap:12px; }
+                .info-block.right { text-align:left; }
                 .info-heading { font-size:14px; }
                 .info-text { font-size:13px; overflow-wrap:anywhere; }
                 .panel { margin:16px 0; }
@@ -470,7 +476,11 @@ const MyOrdersContent = () => {
                 th, td { padding:7px 8px; font-size:12.5px; overflow-wrap:anywhere; }
                 th { font-size:12.5px; }
                 .summary-table .label-cell { width:62%; }
-                .transactions { table-layout:fixed; }
+                .items,
+                .transactions-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+                .items table:not(.summary-table),
+                .transactions { min-width:520px; }
+                .transactions { table-layout:auto; }
                 .transactions th,
                 .transactions td { font-size:11.5px; padding:7px 6px; }
                 .receipt-actions { justify-content:center; }
@@ -498,12 +508,12 @@ const MyOrdersContent = () => {
                   <div class="brand">
                     <img src="${logoUrl}" alt="Citi-Nati logo" />
                   </div>
-                  <div>
-                    <div class="stamp">${paidStamp}</div>
-                  </div>
+                  <div class="stamp stamp--desktop">${paidStamp}</div>
                 </header>
 
                 <h1 class="receipt-title">Receipt #${escapeReceiptText(enrichedOrder.id)}</h1>
+                <div class="stamp stamp--mobile">${paidStamp}</div>
+                <hr class="receipt-rule">
 
                 <section class="info-grid">
                   <div class="info-block">
@@ -557,6 +567,7 @@ const MyOrdersContent = () => {
                   </table>
                 </section>
 
+                <div class="transactions-wrap">
                 <table class="transactions">
                   <thead>
                     <tr>
@@ -579,6 +590,7 @@ const MyOrdersContent = () => {
                     </tr>
                   </tbody>
                 </table>
+                </div>
 
                 <footer class="receipt-footer">
                   <div class="receipt-actions">
@@ -599,7 +611,11 @@ const MyOrdersContent = () => {
                   var frame = document.querySelector('.paper-frame');
                   var paper = document.querySelector('.paper');
                   if (!frame || !paper) return;
-                  var availableWidth = Math.max(300, window.innerWidth - 18);
+                  if (window.innerWidth <= 900) {
+                    document.documentElement.style.setProperty('--receipt-scale', '1');
+                    return;
+                  }
+                  var availableWidth = Math.max(300, window.innerWidth);
                   var paperWidth = paper.offsetWidth || 794;
                   var scale = Math.min(1, availableWidth / paperWidth);
                   document.documentElement.style.setProperty('--receipt-scale', String(scale));
@@ -695,6 +711,7 @@ const MyOrdersContent = () => {
 
     return (
     <div
+      className="my-order-card"
       style={{
         backgroundColor: '#fff',
         padding: '1.5rem',
@@ -707,7 +724,9 @@ const MyOrdersContent = () => {
       }}
     >
       {/* Order Header */}
-      <div style={{
+      <div
+        className="my-order-card__header"
+        style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr 1fr 1fr',
         gap: '1rem',
@@ -785,7 +804,9 @@ const MyOrdersContent = () => {
       </div>
 
       {/* Order Details */}
-      <div style={{
+      <div
+        className="my-order-card__details"
+        style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
         gap: '2rem',
@@ -848,7 +869,9 @@ const MyOrdersContent = () => {
           }}>
             Items ({orderItems.length})
           </p>
-          <div style={{
+          <div
+            className="my-order-card__items"
+            style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: '1rem',

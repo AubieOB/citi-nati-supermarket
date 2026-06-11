@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 
 const Modal = ({ 
@@ -69,15 +70,15 @@ const Modal = ({
   const getIcon = () => {
     switch (type) {
       case 'error':
-        return <i className="fas fa-exclamation-circle" style={{ color: '#dc3545', fontSize: '2rem' }}></i>;
+        return <i className="fas fa-exclamation-circle" style={{ color: '#dc2626', fontSize: '1.55rem' }}></i>;
       case 'warning':
-        return <i className="fas fa-exclamation-triangle" style={{ color: '#ffc107', fontSize: '2rem' }}></i>;
+        return <i className="fas fa-exclamation-triangle" style={{ color: '#f59e0b', fontSize: '1.55rem' }}></i>;
       case 'success':
-        return <i className="fas fa-check-circle" style={{ color: '#2D8659', fontSize: '2rem' }}></i>;
+        return <i className="fas fa-check-circle" style={{ color: '#00b600', fontSize: '1.55rem' }}></i>;
       case 'confirm':
-        return <i className="fas fa-question-circle" style={{ color: '#5B4B8A', fontSize: '2rem' }}></i>;
+        return <i className="fas fa-question-circle" style={{ color: '#0057d9', fontSize: '1.55rem' }}></i>;
       default:
-        return <i className="fas fa-info-circle" style={{ color: '#5B4B8A', fontSize: '2rem' }}></i>;
+        return <i className="fas fa-info-circle" style={{ color: '#0057d9', fontSize: '1.55rem' }}></i>;
     }
   };
 
@@ -85,17 +86,17 @@ const Modal = ({
     if (confirmButtonColor) return confirmButtonColor;
     switch (type) {
       case 'error':
-        return '#dc3545';
+        return '#dc2626';
       case 'warning':
-        return '#ffc107';
+        return '#f59e0b';
       case 'success':
-        return '#2D8659';
+        return '#00a820';
       default:
-        return '#5B4B8A';
+        return '#0057d9';
     }
   };
 
-  return (
+  const modalMarkup = (
     <>
       {/* Overlay - Blocks interaction outside modal */}
       <div
@@ -106,11 +107,12 @@ const Modal = ({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backgroundColor: 'rgba(15, 23, 42, 0.52)',
+          backdropFilter: 'blur(3px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1490,
+          zIndex: 11990,
           pointerEvents: 'auto',
           WebkitTouchCallout: 'none',
           WebkitUserSelect: 'none',
@@ -133,12 +135,13 @@ const Modal = ({
           left: '50%',
           transform: 'translate(-50%, -50%)',
           backgroundColor: isAdminDarkTheme ? '#1e1e1e' : '#fff',
-          borderRadius: '12px',
-          boxShadow: isAdminDarkTheme ? '0 18px 45px rgba(0, 0, 0, 0.45)' : '0 10px 40px rgba(0, 0, 0, 0.2)',
-          zIndex: 1500,
-          maxWidth: '500px',
-          width: '90%',
-          maxHeight: '70vh',
+          borderRadius: '8px',
+          border: `1px solid ${isAdminDarkTheme ? '#2f3a46' : '#e2e8f0'}`,
+          boxShadow: isAdminDarkTheme ? '0 18px 45px rgba(0, 0, 0, 0.45)' : '0 20px 60px rgba(15, 23, 42, 0.22)',
+          zIndex: 12000,
+          maxWidth: '440px',
+          width: 'min(92vw, 440px)',
+          maxHeight: '82vh',
           overflow: 'auto',
           animation: 'modalSlideIn 0.3s ease',
           pointerEvents: 'auto',
@@ -179,16 +182,16 @@ const Modal = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '1rem',
+            padding: '0.82rem 0.95rem',
             borderBottom: `1px solid ${isAdminDarkTheme ? '#333333' : '#e9ecef'}`,
             gap: '1rem',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px' }}>
               {getIcon()}
             </div>
-            <h3 id="modal-title" style={{ margin: 0, color: isAdminDarkTheme ? '#dbe7f8' : '#333', fontSize: '1.1rem', fontWeight: '600' }}>
+            <h3 id="modal-title" style={{ margin: 0, color: isAdminDarkTheme ? '#dbe7f8' : '#142033', fontSize: '1rem', fontWeight: '800' }}>
               {title}
             </h3>
           </div>
@@ -198,16 +201,18 @@ const Modal = ({
             </div>
           )}
           <button
+            className="app-modal-close"
+            aria-label="Close dialog"
             onClick={onCancel}
             style={{
               background: 'none',
               border: 'none',
-              fontSize: '1.5rem',
+              fontSize: '1rem',
               cursor: 'pointer',
-              color: isAdminDarkTheme ? '#b0b0b0' : '#999',
+              color: isAdminDarkTheme ? '#b0b0b0' : '#64748b',
               padding: '0',
-              width: '30px',
-              height: '30px',
+              width: '28px',
+              height: '28px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -223,7 +228,7 @@ const Modal = ({
         <div
           id="modal-description"
           style={{
-            padding: '1rem',
+            padding: '0.9rem 1rem',
             color: isAdminDarkTheme ? '#cccccc' : '#555',
             lineHeight: '1.6',
             fontSize: '0.9rem',
@@ -239,9 +244,9 @@ const Modal = ({
             display: 'flex',
             justifyContent: 'flex-end',
             gap: '0.75rem',
-            padding: '1rem',
+            padding: '0.78rem 1rem',
             borderTop: `1px solid ${isAdminDarkTheme ? '#333333' : '#e9ecef'}`,
-            backgroundColor: isAdminDarkTheme ? '#181818' : '#f8f9fa',
+            backgroundColor: isAdminDarkTheme ? '#181818' : '#f8fbff',
             borderBottomLeftRadius: '12px',
             borderBottomRightRadius: '12px',
           }}
@@ -252,7 +257,7 @@ const Modal = ({
               ref={cancelBtnRef}
               onClick={onCancel}
               style={{
-                padding: '0.625rem 1.25rem',
+                padding: '0.55rem 1.1rem',
                 borderRadius: '6px',
                 border: `1px solid ${isAdminDarkTheme ? '#3a3a3a' : '#ddd'}`,
                 backgroundColor: isAdminDarkTheme ? '#222222' : '#fff',
@@ -285,7 +290,7 @@ const Modal = ({
               }
             }}
             style={{
-              padding: '0.625rem 1.25rem',
+              padding: '0.55rem 1.1rem',
               borderRadius: '6px',
               border: 'none',
               backgroundColor: getConfirmButtonColor(),
@@ -314,6 +319,12 @@ const Modal = ({
       </div>
     </>
   );
+
+  if (typeof document === 'undefined') {
+    return modalMarkup;
+  }
+
+  return createPortal(modalMarkup, document.body);
 };
 
 export default Modal;

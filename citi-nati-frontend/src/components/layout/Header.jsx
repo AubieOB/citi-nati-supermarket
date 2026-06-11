@@ -27,16 +27,18 @@ const Header = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchTouched, setSearchTouched] = useState(false);
   const [addingProductId, setAddingProductId] = useState(null);
+  const [addedProductId, setAddedProductId] = useState(null);
   const popupRef = useRef(null);
   const menuRef = useRef(null);
   const searchDebounceRef = useRef(null);
   const searchAbortRef = useRef(null);
   const searchRequestIdRef = useRef(0);
+  const addedFeedbackTimerRef = useRef(null);
   const { user, isAuthenticated, logout, isLoading: authLoading } = useAuth();
   const { cartCount, fetchCartCount, updateCartCount, resetCart } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
-  const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
+  const { modal, closeModal, showConfirm, showError } = useModal();
   const isOrderFlowHeader = location.pathname === '/cart' || location.pathname === '/checkout';
 
   useEffect(() => {
@@ -110,7 +112,6 @@ const Header = () => {
       return;
     }
 
-    setSearchLoading(true);
     searchDebounceRef.current = setTimeout(() => {
       if (searchAbortRef.current) {
         searchAbortRef.current.abort();
@@ -161,6 +162,9 @@ const Header = () => {
       }
       if (searchAbortRef.current) {
         searchAbortRef.current.abort();
+      }
+      if (addedFeedbackTimerRef.current) {
+        clearTimeout(addedFeedbackTimerRef.current);
       }
     };
   }, []);
@@ -216,7 +220,11 @@ const Header = () => {
         quantity: 1,
       });
       trackProductInteraction(product, 'add_to_cart', searchTerm.trim());
-      showSuccess('Added to Cart', `${product.name} added to cart!`);
+      setAddedProductId(product.id);
+      if (addedFeedbackTimerRef.current) {
+        clearTimeout(addedFeedbackTimerRef.current);
+      }
+      addedFeedbackTimerRef.current = setTimeout(() => setAddedProductId(null), 1600);
       await updateCartCount();
     } catch (err) {
       if (err.response?.status === 401) {
@@ -278,14 +286,6 @@ const Header = () => {
           <div className="header__search-state">Type at least 2 characters to search products.</div>
         )}
 
-        {query.length >= 2 && searchLoading && (
-          <div className="header__search-skeletons" aria-label="Loading product suggestions">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-        )}
-
         {query.length >= 2 && !searchLoading && searchSuggestions.length === 0 && (
           <div className="header__search-state">No products found for "{query}".</div>
         )}
@@ -294,6 +294,7 @@ const Header = () => {
           const availableStock = resolveEffectiveStock(product);
           const price = Number(product.finalPrice || product.price || 0);
           const isAdding = addingProductId === product.id;
+          const wasAdded = addedProductId === product.id;
 
           return (
             <div className="header__search-product" key={product.id} role="option" aria-selected="false">
@@ -316,7 +317,7 @@ const Header = () => {
                 </span>
                 <span className="header__search-product-copy">
                   <strong>{product.name}</strong>
-                  <small>
+                  <small className={availableStock > 0 ? '' : 'is-out-of-stock'}>
                     {product.category || 'Product'} · {availableStock > 0 ? `In stock (${availableStock})` : 'Out of stock'}
                   </small>
                   <em>{formatMWK(price)}</em>
@@ -325,13 +326,13 @@ const Header = () => {
 
               <button
                 type="button"
-                className="header__search-cart-button"
+                className={`header__search-cart-button${wasAdded ? ' is-added' : ''}`}
                 onClick={() => handleQuickAddToCart(product)}
                 disabled={availableStock <= 0 || isAdding}
                 aria-label={`Add ${product.name} to cart`}
                 title={availableStock > 0 ? 'Add to cart' : 'Out of stock'}
               >
-                <i className={`fas ${isAdding ? 'fa-spinner fa-spin' : 'fa-cart-plus'}`} aria-hidden="true"></i>
+                <i className={`fas ${isAdding ? 'fa-spinner fa-spin' : wasAdded ? 'fa-check' : 'fa-cart-plus'}`} aria-hidden="true"></i>
               </button>
             </div>
           );
@@ -417,7 +418,7 @@ const Header = () => {
             {navLinks}
           </nav>
 
-          <div className="header__actions">
+          <div className={`header__actions${searchOpen ? ' header__actions--search-open' : ''}`}>
             <div className="header__search-area">
               <form className={`header__search-drawer${searchOpen ? ' header__search-drawer--open' : ''}`} onSubmit={handleSearchSubmit} role="search">
                 <button
