@@ -313,7 +313,7 @@ const Home = () => {
                 return (
                   <article key={product.id} className="home-featured-product">
                     <Link
-                      to={`/products?search=${encodeURIComponent(product.name)}`}
+                      to={`/products?productId=${encodeURIComponent(product.id)}&search=${encodeURIComponent(product.name)}`}
                       className="home-featured-product__main"
                       onClick={() => trackProductInteraction(product, 'view')}
                     >

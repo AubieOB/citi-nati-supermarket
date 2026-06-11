@@ -136,7 +136,6 @@ function AppInner() {
 
   const loadingFallback = (
     <div className="storefront-loading-state" role="status" aria-label="Loading">
-      <span className="storefront-loading-spinner" aria-hidden="true"></span>
     </div>
   );
 

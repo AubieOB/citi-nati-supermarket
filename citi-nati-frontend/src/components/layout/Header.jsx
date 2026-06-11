@@ -299,7 +299,7 @@ const Header = () => {
           return (
             <div className="header__search-product" key={product.id} role="option" aria-selected="false">
               <Link
-                to={`/products?search=${encodeURIComponent(query)}`}
+                to={`/products?productId=${encodeURIComponent(product.id)}&search=${encodeURIComponent(product.name || query)}`}
                 className="header__search-product-link"
                 onClick={() => {
                   trackProductInteraction(product, 'view', query);
@@ -444,9 +444,6 @@ const Header = () => {
                   placeholder="Search groceries..."
                   aria-label="Search products"
                 />
-                <button type="submit" className="header__search-submit">
-                  Search
-                </button>
                 {renderSearchSuggestions()}
               </form>
             </div>

@@ -4698,8 +4698,7 @@ h6 {
   font-size: 0.95rem;
 }
 
-.header__search-drawer input,
-.header__search-submit {
+.header__search-drawer input {
   width: 0;
   min-width: 0;
   padding: 0;
@@ -4719,30 +4718,13 @@ h6 {
   color: rgba(255, 255, 255, 0.75);
 }
 
-.header__search-submit {
-  height: 30px;
-  margin-right: 0.25rem;
-  border-radius: 999px;
-  background: #fff;
-  color: var(--store-green-dark);
-  font-weight: 800;
-  font-size: 0.78rem;
-}
-
 .header__search-drawer--open {
-  width: 330px;
+  width: 256px;
   background: rgba(255, 255, 255, 0.18);
 }
 
 .header__search-drawer--open input {
   width: 185px;
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.header__search-drawer--open .header__search-submit {
-  width: 68px;
-  padding: 0 0.7rem;
   opacity: 1;
   pointer-events: auto;
 }
@@ -4891,10 +4873,6 @@ h6 {
 
   .header__search-drawer--open {
     width: calc(100vw - 8.5rem);
-  }
-
-  .header__search-submit {
-    display: none;
   }
 
   .header__search-drawer--open input {
@@ -7400,7 +7378,6 @@ h6 {
   color: #fff !important;
 }
 
-.header__search-submit,
 .search-suggestions__cart,
 .product-card__button,
 .products-toolbar__button {
@@ -8456,8 +8433,7 @@ a {
     width: auto !important;
   }
 
-  .header__search-drawer input,
-  .header__search-submit {
+  .header__search-drawer input {
     display: none !important;
   }
 
@@ -8468,7 +8444,7 @@ a {
     top: 6px !important;
     z-index: 252 !important;
     display: grid !important;
-    grid-template-columns: 42px minmax(0, 1fr) 42px !important;
+    grid-template-columns: 42px minmax(0, 1fr) !important;
     gap: 0.35rem !important;
     align-items: center !important;
     width: auto !important;
@@ -8492,10 +8468,6 @@ a {
 
   .header__search-drawer--open input::placeholder {
     color: rgba(255, 255, 255, 0.84) !important;
-  }
-
-  .header__search-drawer--open .header__search-submit {
-    display: none !important;
   }
 
   .header__search-results {
@@ -8871,7 +8843,7 @@ a {
     inset: auto !important;
     width: 100% !important;
     max-width: none !important;
-    grid-template-columns: 42px minmax(0, 1fr) 44px !important;
+    grid-template-columns: 42px minmax(0, 1fr) !important;
     gap: 0.42rem !important;
     padding: 0 !important;
   }
@@ -8881,16 +8853,6 @@ a {
     min-width: 0 !important;
     padding: 0 0.72rem !important;
     font-size: 0.9rem !important;
-  }
-
-  .header__search-drawer--open .header__search-submit {
-    display: inline-grid !important;
-    width: 44px !important;
-    height: 42px !important;
-    min-width: 44px !important;
-    padding: 0 !important;
-    place-items: center !important;
-    border-radius: 12px !important;
   }
 
   .header__search-results {

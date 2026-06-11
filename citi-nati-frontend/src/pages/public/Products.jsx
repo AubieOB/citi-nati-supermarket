@@ -49,6 +49,12 @@ function mergeUniqueProducts(existingProducts, incomingProducts) {
   return Array.from(productMap.values());
 }
 
+function filterToSelectedProduct(products, productId) {
+  const selectedId = String(productId || '').trim();
+  if (!selectedId) return products;
+  return products.filter((product) => String(product.id) === selectedId);
+}
+
 /**
  * Products Page - Enhanced with Search, Filters, and Promotions
  * 
@@ -102,6 +108,7 @@ const Products = () => {
   const selectedCategory = searchParams.get('category') || '';
   const onSaleOnly = searchParams.get('onSale') === 'true';
   const searchQueryParam = searchParams.get('search') || '';
+  const productIdParam = searchParams.get('productId') || '';
 
   /**
    * Predictive search like Amazon/Alibaba
@@ -214,6 +221,9 @@ const Products = () => {
     const effectiveSearch = options?.searchOverride !== undefined
       ? String(options.searchOverride || '').trim()
       : String(searchQueryRef.current || '').trim();
+    const effectiveProductId = options?.productIdOverride !== undefined
+      ? String(options.productIdOverride || '').trim()
+      : String(productIdParam || '').trim();
 
     try {
       // Show loading state
@@ -236,14 +246,14 @@ const Products = () => {
       const currentOffset = isLoadMore ? currentOffsetBase + limit : 0;
       
       // Create cache key
-      const cacheKey = `offset_${currentOffset}_limit_${requestLimit}_category_${effectiveCategory || 'all'}_sale_${effectiveOnSaleOnly}_search_${effectiveSearch || 'none'}`;
+      const cacheKey = `offset_${currentOffset}_limit_${requestLimit}_category_${effectiveCategory || 'all'}_sale_${effectiveOnSaleOnly}_search_${effectiveSearch || 'none'}_product_${effectiveProductId || 'none'}`;
 
       // Check cache (only for initial loads, not Load More to ensure fresh data)
       if (!isLoadMore && !bypassCache && productsCacheRef.current.has(cacheKey)) {
         console.log(`[CACHE HIT] Loading from cache (offset: ${currentOffset})`);
         const cachedData = productsCacheRef.current.get(cacheKey);
         setProducts(cachedData.products);
-        if (effectiveSearch) {
+        if (effectiveSearch || effectiveProductId) {
           setFilteredProducts(cachedData.products);
         }
         setHasMoreProducts(cachedData.hasMore);
@@ -282,7 +292,10 @@ const Products = () => {
       const fetchedProducts = data.products;
       
       // Filter out hidden products
-      const visibleProducts = fetchedProducts.filter(p => !p.hideFromProductsPage);
+      const visibleProducts = filterToSelectedProduct(
+        fetchedProducts.filter(p => !p.hideFromProductsPage),
+        effectiveProductId
+      );
 
       const currentLoadedWindowSize = offsetRef.current > 0
         ? offsetRef.current + limit
@@ -294,7 +307,7 @@ const Products = () => {
       }
       
       // Determine if there are more products
-      const hasMore = fetchedProducts.length === requestLimit;
+      const hasMore = effectiveProductId ? false : fetchedProducts.length === requestLimit;
       
       // Cache the data
       productsCacheRef.current.set(cacheKey, {
@@ -307,14 +320,14 @@ const Products = () => {
       if (isLoadMore) {
         setProducts((prev) => {
           const merged = mergeUniqueProducts(prev, visibleProducts);
-          if (effectiveSearch) {
+          if (effectiveSearch || effectiveProductId) {
             setFilteredProducts(merged);
           }
           return merged;
         });
       } else {
         setProducts(mergeUniqueProducts([], visibleProducts));
-        if (effectiveSearch) {
+        if (effectiveSearch || effectiveProductId) {
           setFilteredProducts(visibleProducts);
         }
       }
@@ -430,8 +443,8 @@ const Products = () => {
     setSearchInput(searchQueryParam.trim());
     
     // Load initial products with new filters
-    fetchProducts(false, { searchOverride: searchQueryParam.trim() }); // isLoadMore = false to replace products
-  }, [selectedCategory, onSaleOnly, searchQueryParam]);
+    fetchProducts(false, { searchOverride: searchQueryParam.trim(), productIdOverride: productIdParam }); // isLoadMore = false to replace products
+  }, [selectedCategory, onSaleOnly, searchQueryParam, productIdParam]);
 
   // Scroll event listener for back-to-top button
   useEffect(() => {
@@ -478,10 +491,13 @@ const Products = () => {
   useEffect(() => {
     // If no search, show all products from current fetch
     if (!searchInput) {
-      const visible = products.filter(p => !p.hideFromProductsPage);
+      const visible = filterToSelectedProduct(
+        products.filter(p => !p.hideFromProductsPage),
+        productIdParam
+      );
       setFilteredProducts(visible);
     }
-  }, [products, searchInput]);
+  }, [products, searchInput, productIdParam]);
 
   /**
    * Listen for real-time product updates (stock, price, promotions, name, etc)
@@ -717,6 +733,16 @@ const Products = () => {
     const value = e.target.value;
     setSearchInput(value);
     searchQueryRef.current = '';
+    if (productIdParam) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('productId');
+      if (value.trim()) {
+        newParams.set('search', value.trim());
+      } else {
+        newParams.delete('search');
+      }
+      setSearchParams(newParams);
+    }
     handlePredictiveSearch(value);
     console.log(`[PRODUCTS SEARCH] User typing: "${value}"`);
   };
@@ -734,6 +760,7 @@ const Products = () => {
     searchQueryRef.current = '';
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('search');
+    newParams.delete('productId');
     setSearchParams(newParams);
     handlePredictiveSearch('');
   };
@@ -768,6 +795,7 @@ const Products = () => {
     } else {
       newParams.delete('category');
     }
+    newParams.delete('productId');
     newParams.set('page', '1'); // Reset to page 1 when changing category
     setSearchParams(newParams);
   };
@@ -782,6 +810,7 @@ const Products = () => {
     } else {
       newParams.set('onSale', 'true');
     }
+    newParams.delete('productId');
     newParams.set('page', '1'); // Reset to page 1 when changing filters
     setSearchParams(newParams);
   };
