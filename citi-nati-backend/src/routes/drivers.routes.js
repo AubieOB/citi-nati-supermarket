@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
 const { createDriver, createDriverWithAccount, getDrivers, updateDriver, deleteDriver, getDriverPerformance, getDriverPerformanceByDay, clearDriverPerformance } = require('../controllers/drivers.controller');
+const { registerDriverPushToken, unregisterDriverPushToken } = require('../controllers/driverPushTokens.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const { verifyDriver } = require('../middleware/driver.middleware');
@@ -57,6 +58,12 @@ router.post('/security-key/verify', verifyTokenMiddleware, verifyDriver, async (
 		return res.status(500).json({ success: false, error: 'Failed to verify driver security key' });
 	}
 });
+
+// POST /api/drivers/mobile-push-token - Register this device for driver push notifications (DRIVER only)
+router.post('/mobile-push-token', verifyTokenMiddleware, verifyDriver, registerDriverPushToken);
+
+// DELETE /api/drivers/mobile-push-token - Disable this device's driver push token (DRIVER only)
+router.delete('/mobile-push-token', verifyTokenMiddleware, verifyDriver, unregisterDriverPushToken);
 
 // POST /api/drivers/with-account - Create driver with user account (ADMIN only - new drivers can login)
 // DEFINE SPECIFIC ROUTES FIRST before generic ones

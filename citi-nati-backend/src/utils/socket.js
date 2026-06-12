@@ -9,6 +9,7 @@
  */
 
 const { computeExpiryStatus } = require('./expiryStatus');
+const { sendDriverOrderPush } = require('../services/driverPushNotification.service');
 const logger = require('./logger');
 
 /**
@@ -59,6 +60,7 @@ const emitOrderAssigned = (driverId, order) => {
         phone: order.phone,
         createdAt: order.createdAt,
       });
+      void sendDriverOrderPush('orderAssigned', driverId, order);
       logger.debugLog(`[Socket.io] Order ${order.id} assigned to driver_${driverId}`);
     }
   } catch (err) {
@@ -136,6 +138,7 @@ const emitOrderUpdated = (order) => {
       // Emit to assigned driver (if order has a driver assigned)
       if (order.driverId) {
         global.io.to(`driver_${order.driverId}`).emit('orderUpdated', eventData);
+        void sendDriverOrderPush('orderUpdated', order.driverId, eventData);
         logger.debugLog(`[Socket.io] Order ${order.id} emitted to driver_${order.driverId}`);
       }
 

@@ -52,8 +52,28 @@ model User {
   permissionAuditLogsTargeted PermissionAuditLog[] @relation("PermissionAuditTarget")
   refreshTokens           RefreshToken[]
   securityAuditLogs       SecurityAuditLog[] @relation("SecurityAuditActor")
+  mobilePushTokens        MobilePushToken[]
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+}
+
+model MobilePushToken {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  driverId   String?
+  token      String   @unique
+  platform   String   @default("android")
+  app        String   @default("driver")
+  deviceId   String?
+  deviceName String?
+  isActive   Boolean  @default(true)
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId, app, isActive])
+  @@index([driverId, app, isActive])
 }
 
 model RefreshToken {
