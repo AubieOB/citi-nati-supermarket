@@ -105,14 +105,31 @@ async function clearFailedLoginState(userId) {
 
 const buildAuthUserPayload = async (user) => {
   const effectivePermissions = await getEffectivePermissionsForUser(user.id, user.role);
+  const driverProfile =
+    user.role === 'driver'
+      ? await prisma.driver.findUnique({
+          where: { email: user.email },
+          select: { id: true, name: true, email: true, phone: true },
+        })
+      : null;
 
   return {
     id: user.id,
     email: user.email,
-    name: user.name,
+    name: driverProfile?.name || user.name,
+    phone: driverProfile?.phone || null,
     role: user.role,
     emailVerified: user.emailVerified,
     permissions: effectivePermissions,
+    driver: driverProfile
+      ? {
+          id: driverProfile.id,
+          name: driverProfile.name,
+          email: driverProfile.email,
+          phone: driverProfile.phone,
+          role: 'driver',
+        }
+      : undefined,
   };
 };
 
