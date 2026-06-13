@@ -1,9 +1,9 @@
 const { PrismaClient } = require('@prisma/client');
 const axios = require('axios');
 const PDFDocument = require('pdfkit');
-const { emitNewOrder, emitOrderAssigned, emitOrderStatusUpdated, emitOrderUpdated, emitOrderUpdatedToAdminAndCustomer } = require('../utils/socket');
+const { emitNewOrder, emitOrderAssigned, emitOrderStatusUpdated, emitOrderUnassigned, emitOrderUpdated, emitOrderUpdatedToAdminAndCustomer } = require('../utils/socket');
 const { notifyDriverAssigned, notifyOrderCompleted } = require('../utils/messageService');
-const { sendDriverAssignedEmail, sendDeliveryStatusEmail, sendRefundNotificationEmail } = require('../utils/emailService');
+const { sendDriverAssignedEmail, sendDriverChangedEmail, sendDeliveryStatusEmail, sendRefundNotificationEmail } = require('../utils/emailService');
 const { isPaymentConfirmedInCache } = require('../utils/webhookCache');
 const { splitInclusiveVat } = require('../utils/vat');
 const { formatBusinessDateTimeLabel } = require('../utils/businessTime');
@@ -20,6 +20,23 @@ const normalizeDeliveryStatus = (status) => {
     FAILED_DELIVERY: 'FAILED',
   };
   return aliases[normalized] || normalized;
+};
+
+const getStatusTimingData = (status, order = {}) => {
+  const now = new Date();
+  if (status === 'ACCEPTED') {
+    return { acceptedAt: order.acceptedAt || now };
+  }
+  if (status === 'IN_TRANSIT') {
+    return { startedAt: order.startedAt || now };
+  }
+  if (status === 'DELIVERED') {
+    return { deliveredAt: order.deliveredAt || now };
+  }
+  if (status === 'FAILED') {
+    return { failedAt: order.failedAt || now };
+  }
+  return {};
 };
 
 const createOrder = async (req, res) => {
@@ -309,7 +326,7 @@ const updateOrderStatus = async (req, res) => {
     // Update order status
     const updatedOrder = await prisma.order.update({
       where: { id: parseInt(id) },
-      data: { status: normalizedStatus },
+      data: { status: normalizedStatus, ...getStatusTimingData(normalizedStatus, order) },
       include: {
         user: {
           select: { id: true, name: true, email: true }
@@ -379,7 +396,7 @@ const updateOrderStatus = async (req, res) => {
 const assignDriverToOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { driverId } = req.body;
+    const { driverId, reason } = req.body;
 
     // Validate order ID
     if (!id || isNaN(parseInt(id))) {
@@ -400,10 +417,37 @@ const assignDriverToOrder = async (req, res) => {
       return res.status(404).json({ error: 'Driver not found' });
     }
 
+    const existingOrder = await prisma.order.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        driver: true,
+        user: true,
+      },
+    });
+
+    if (!existingOrder) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    if (['DELIVERED', 'CANCELLED', 'REFUNDED'].includes(existingOrder.status)) {
+      return res.status(400).json({ error: 'Completed, cancelled, or refunded orders cannot be reassigned' });
+    }
+
+    const isReassignment = Boolean(existingOrder.driverId && existingOrder.driverId !== driverId);
+    const reassignmentReason = typeof reason === 'string' && reason.trim() ? reason.trim() : 'Operational reassignment';
+
     // Update order with driver and set status to ASSIGNED
     const updatedOrder = await prisma.order.update({
       where: { id: parseInt(id) },
-      data: { driverId, status: 'ASSIGNED' },
+      data: {
+        driverId,
+        status: 'ASSIGNED',
+        assignedAt: new Date(),
+        acceptedAt: null,
+        startedAt: null,
+        deliveredAt: null,
+        failedAt: null,
+      },
       include: {
         user: true,
         driver: true,
@@ -415,6 +459,10 @@ const assignDriverToOrder = async (req, res) => {
       },
     });
 
+    if (isReassignment) {
+      emitOrderUnassigned(existingOrder.driverId, updatedOrder);
+    }
+
     // Emit order assigned event to driver (non-blocking)
     emitOrderAssigned(driverId, updatedOrder);
     
@@ -424,7 +472,7 @@ const assignDriverToOrder = async (req, res) => {
     // Create admin notification
     await notifyDriverAssigned(updatedOrder, driver);
 
-    // Send driver assigned email to customer
+    // Send driver assigned or changed email to customer
     try {
       const driverInfo = {
         name: driver.name,
@@ -439,14 +487,25 @@ const assignDriverToOrder = async (req, res) => {
         items: updatedOrder.items?.length || 0,
       };
 
-      await sendDriverAssignedEmail(
-        updatedOrder.user.email,
-        updatedOrder.user.name,
-        driverInfo,
-        orderDetails
-      );
+      if (isReassignment) {
+        await sendDriverChangedEmail(
+          updatedOrder.user.email,
+          updatedOrder.user.name,
+          existingOrder.driver,
+          driverInfo,
+          orderDetails,
+          reassignmentReason
+        );
+      } else {
+        await sendDriverAssignedEmail(
+          updatedOrder.user.email,
+          updatedOrder.user.name,
+          driverInfo,
+          orderDetails
+        );
+      }
 
-      logger.debugLog(`[Email] Driver assigned email sent to ${updatedOrder.user.email}`);
+      logger.debugLog(`[Email] Driver ${isReassignment ? 'changed' : 'assigned'} email sent to ${updatedOrder.user.email}`);
     } catch (emailErr) {
       logger.errorLog(`[Email] ❌ Failed to send driver assigned email:`, emailErr.message);
       // Don't fail the assignment if email fails

@@ -409,6 +409,34 @@ const sendDeliveryStatusEmail = async (email, userName, orderDetails, status) =>
   }
 };
 
+const sendDriverChangedEmail = async (email, userName, oldDriverInfo, newDriverInfo, orderDetails, reason) => {
+  try {
+    logger.debugLog('Sending driver changed email', { email, orderId: orderDetails.id });
+    const html = renderTemplate({
+      title: 'Delivery Driver Updated',
+      intro: `Hi ${escapeHtml(userName)}, we have updated the driver assigned to your order.`,
+      body: `
+        ${renderInfoBox([
+          { label: 'Order Number', value: `#${orderDetails.id}` },
+          { label: 'Previous Driver', value: oldDriverInfo?.name || 'Previous driver' },
+          { label: 'New Driver', value: newDriverInfo?.name || 'New driver assigned' },
+          { label: 'New Driver Phone', value: getDriverPhone(newDriverInfo) },
+          { label: 'Reason', value: reason || 'Operational reassignment' },
+          { label: 'Delivery Address', value: orderDetails.deliveryAddress || 'N/A' },
+          { label: 'Total Amount', value: orderDetails.totalPrice ? formatMoney(orderDetails.totalPrice) : undefined },
+        ])}
+        <p style="color:${BRAND.muted};font-size:13px;line-height:1.6;">Your delivery remains active. We will send another update when the driver starts delivery.</p>
+      `,
+      accent: BRAND.blue,
+    });
+
+    return await sendEmail(email, 'Delivery Driver Updated - Order #' + orderDetails.id, html);
+  } catch (err) {
+    logger.errorLog('Error in sendDriverChangedEmail', { error: err.message, email, orderId: orderDetails.id });
+    return { success: false, error: err.message };
+  }
+};
+
 const sendRefundNotificationEmail = async (email, userName, refundDetails) => {
   try {
     logger.debugLog('Sending refund notification email', { email, orderId: refundDetails.orderId });
@@ -442,6 +470,7 @@ module.exports = {
   sendOrderConfirmationEmail,
   sendPaymentConfirmationEmail,
   sendDriverAssignedEmail,
+  sendDriverChangedEmail,
   sendDeliveryStatusEmail,
   sendRefundNotificationEmail,
 };

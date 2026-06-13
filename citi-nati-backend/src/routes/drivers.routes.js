@@ -1,7 +1,19 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
-const { createDriver, createDriverWithAccount, getDrivers, updateDriver, deleteDriver, getDriverPerformance, getDriverPerformanceByDay, clearDriverPerformance } = require('../controllers/drivers.controller');
+const {
+	createDriver,
+	createDriverWithAccount,
+	getDrivers,
+	updateDriver,
+	deleteDriver,
+	getDriverAvailability,
+	updateDriverAvailability,
+	updateDriverPresence,
+	getDriverPerformance,
+	getDriverPerformanceByDay,
+	clearDriverPerformance,
+} = require('../controllers/drivers.controller');
 const { registerDriverPushToken, unregisterDriverPushToken } = require('../controllers/driverPushTokens.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
@@ -64,6 +76,15 @@ router.post('/mobile-push-token', verifyTokenMiddleware, verifyDriver, registerD
 
 // DELETE /api/drivers/mobile-push-token - Disable this device's driver push token (DRIVER only)
 router.delete('/mobile-push-token', verifyTokenMiddleware, verifyDriver, unregisterDriverPushToken);
+
+// GET /api/drivers/availability - Load current driver's availability (DRIVER only)
+router.get('/availability', verifyTokenMiddleware, verifyDriver, getDriverAvailability);
+
+// PUT /api/drivers/availability - Update current driver's availability (DRIVER only)
+router.put('/availability', verifyTokenMiddleware, verifyDriver, updateDriverAvailability);
+
+// PUT /api/drivers/presence - Update current driver's live presence (DRIVER only)
+router.put('/presence', verifyTokenMiddleware, verifyDriver, updateDriverPresence);
 
 // POST /api/drivers/with-account - Create driver with user account (ADMIN only - new drivers can login)
 // DEFINE SPECIFIC ROUTES FIRST before generic ones

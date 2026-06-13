@@ -254,6 +254,11 @@ model Order {
   notes           String?
   driverId        String?
   driver          Driver?  @relation("DriverOrders", fields: [driverId], references: [id])
+  assignedAt      DateTime? @map("assigned_at")
+  acceptedAt      DateTime? @map("accepted_at")
+  startedAt       DateTime? @map("started_at")
+  deliveredAt     DateTime? @map("delivered_at")
+  failedAt        DateTime? @map("failed_at")
   salesDayId      Int?
   salesDay        SalesDay? @relation(fields: [salesDayId], references: [id], onDelete: SetNull)
   createdAt       DateTime @default(now())
@@ -293,6 +298,12 @@ model Driver {
   name           String
   phone          String?  @unique
   email          String?  @unique
+  availability   String   @default("READY")
+  availabilityReason String? @map("availability_reason")
+  availabilityUpdatedAt DateTime? @map("availability_updated_at")
+  presenceStatus String   @default("OFFLINE") @map("presence_status")
+  presenceUpdatedAt DateTime? @map("presence_updated_at")
+  lastSeenAt     DateTime? @map("last_seen_at")
   assignedOrders Order[]  @relation("DriverOrders")
   createdAt      DateTime @default(now())
 }

@@ -58,13 +58,58 @@ const emitOrderAssigned = (driverId, order) => {
         latitude: order.latitude,
         longitude: order.longitude,
         phone: order.phone,
+        assignedAt: order.assignedAt,
+        acceptedAt: order.acceptedAt,
+        startedAt: order.startedAt,
+        deliveredAt: order.deliveredAt,
+        failedAt: order.failedAt,
         createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
       });
       void sendDriverOrderPush('orderAssigned', driverId, order);
       logger.debugLog(`[Socket.io] Order ${order.id} assigned to driver_${driverId}`);
     }
   } catch (err) {
     logger.errorLog('Error emitting orderAssigned event:', err.message);
+  }
+};
+
+const emitOrderUnassigned = (driverId, order) => {
+  try {
+    if (global.io && driverId && order) {
+      global.io.to(`driver_${driverId}`).emit('orderUnassigned', {
+        id: order.id,
+        previousDriverId: driverId,
+        driverId: order.driverId || null,
+        status: order.status,
+        updatedAt: order.updatedAt,
+      });
+      logger.debugLog(`[Socket.io] Order ${order.id} removed from driver_${driverId}`);
+    }
+  } catch (err) {
+    logger.errorLog('Error emitting orderUnassigned event:', err.message);
+  }
+};
+
+const emitDriverAvailabilityUpdated = (driver) => {
+  try {
+    if (global.io && driver) {
+      global.io.to('admin_room').emit('driverAvailabilityUpdated', {
+        id: driver.id,
+        name: driver.name,
+        email: driver.email,
+        phone: driver.phone,
+        availability: driver.availability,
+        availabilityReason: driver.availabilityReason,
+        availabilityUpdatedAt: driver.availabilityUpdatedAt,
+        presenceStatus: driver.presenceStatus,
+        presenceUpdatedAt: driver.presenceUpdatedAt,
+        lastSeenAt: driver.lastSeenAt,
+      });
+      logger.debugLog(`[Socket.io] Driver ${driver.id} availability emitted to admin_room`);
+    }
+  } catch (err) {
+    logger.errorLog('Error emitting driverAvailabilityUpdated event:', err.message);
   }
 };
 
@@ -87,6 +132,11 @@ const emitOrderUpdatedToAdminAndCustomer = (order) => {
         latitude: order.latitude,
         longitude: order.longitude,
         phone: order.phone,
+        assignedAt: order.assignedAt,
+        acceptedAt: order.acceptedAt,
+        startedAt: order.startedAt,
+        deliveredAt: order.deliveredAt,
+        failedAt: order.failedAt,
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
       };
@@ -127,6 +177,11 @@ const emitOrderUpdated = (order) => {
         latitude: order.latitude,
         longitude: order.longitude,
         phone: order.phone,
+        assignedAt: order.assignedAt,
+        acceptedAt: order.acceptedAt,
+        startedAt: order.startedAt,
+        deliveredAt: order.deliveredAt,
+        failedAt: order.failedAt,
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
       };
@@ -296,6 +351,8 @@ const emitPosSyncEvent = (event) => {
 module.exports = {
   emitNewOrder,
   emitOrderAssigned,
+  emitOrderUnassigned,
+  emitDriverAvailabilityUpdated,
   emitOrderStatusUpdated,
   emitOrderUpdated,
   emitOrderUpdatedToAdminAndCustomer,

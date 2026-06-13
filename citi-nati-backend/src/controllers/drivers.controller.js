@@ -1,6 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
-const { emitOrderStatusUpdated, emitOrderUpdated } = require('../utils/socket');
+const { emitDriverAvailabilityUpdated, emitOrderStatusUpdated, emitOrderUnassigned, emitOrderUpdated } = require('../utils/socket');
 const { sendDeliveryStatusEmail } = require('../utils/emailService');
 const { validateStrongPassword } = require('../utils/passwordPolicy');
 const logger = require('../utils/logger');
@@ -14,6 +14,61 @@ const normalizeDeliveryStatus = (status) => {
     FAILED_DELIVERY: 'FAILED',
   };
   return aliases[normalized] || normalized;
+};
+
+const ACTIVE_DRIVER_ORDER_STATUSES = ['ASSIGNED', 'ACCEPTED', 'IN_TRANSIT'];
+const DRIVER_AVAILABILITY = ['READY', 'BUSY', 'UNAVAILABLE'];
+
+const getStatusTimingData = (status, order = {}) => {
+  const now = new Date();
+  if (status === 'ACCEPTED') {
+    return { acceptedAt: order.acceptedAt || now };
+  }
+  if (status === 'IN_TRANSIT') {
+    return { startedAt: order.startedAt || now };
+  }
+  if (status === 'DELIVERED') {
+    return { deliveredAt: order.deliveredAt || now };
+  }
+  if (status === 'FAILED') {
+    return { failedAt: order.failedAt || now };
+  }
+  return {};
+};
+
+const sanitizeDriver = (driver) => {
+  if (!driver) return driver;
+  const activeOrders = driver.assignedOrders || [];
+  return {
+    ...driver,
+    activeDeliveryCount: activeOrders.length,
+    effectiveAvailability: activeOrders.length > 0 ? 'BUSY' : driver.availability,
+  };
+};
+
+const getCurrentDriver = async (userId) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true },
+  });
+
+  if (!user) {
+    const error = new Error('User not found');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const driver = await prisma.driver.findUnique({
+    where: { email: user.email },
+  });
+
+  if (!driver) {
+    const error = new Error('Driver profile not found');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return driver;
 };
 
 /**
@@ -150,19 +205,107 @@ const getDrivers = async (req, res) => {
   try {
     const drivers = await prisma.driver.findMany({
       include: {
-        assignedOrders: true,
+        assignedOrders: {
+          where: { status: { in: ACTIVE_DRIVER_ORDER_STATUSES } },
+          select: {
+            id: true,
+            status: true,
+            assignedAt: true,
+            acceptedAt: true,
+            startedAt: true,
+            createdAt: true,
+          },
+        },
       },
     });
 
     return res.status(200).json({
       message: 'Drivers retrieved successfully',
-      drivers,
+      drivers: drivers.map(sanitizeDriver),
     });
   } catch (err) {
     logger.errorLog('Error fetching drivers:', err);
     return res.status(500).json({
       error: 'Server error while fetching drivers',
     });
+  }
+};
+
+const getDriverAvailability = async (req, res) => {
+  try {
+    const driver = await getCurrentDriver(req.user.userId);
+    return res.status(200).json({ driver: sanitizeDriver({ ...driver, assignedOrders: [] }) });
+  } catch (err) {
+    return res.status(err.statusCode || 500).json({ error: err.message || 'Failed to load driver availability' });
+  }
+};
+
+const updateDriverAvailability = async (req, res) => {
+  try {
+    const { availability, reason } = req.body;
+    const normalizedAvailability = String(availability || '').trim().toUpperCase();
+
+    if (!DRIVER_AVAILABILITY.includes(normalizedAvailability)) {
+      return res.status(400).json({ error: 'Availability must be READY, BUSY, or UNAVAILABLE' });
+    }
+
+    const normalizedReason = typeof reason === 'string' ? reason.trim() : '';
+    if (['BUSY', 'UNAVAILABLE'].includes(normalizedAvailability) && !normalizedReason) {
+      return res.status(400).json({ error: 'Reason is required when setting Busy or Unavailable' });
+    }
+
+    const driver = await getCurrentDriver(req.user.userId);
+    const updatedDriver = await prisma.driver.update({
+      where: { id: driver.id },
+      data: {
+        availability: normalizedAvailability,
+        availabilityReason: normalizedAvailability === 'READY' ? null : normalizedReason,
+        availabilityUpdatedAt: new Date(),
+      },
+      include: {
+        assignedOrders: {
+          where: { status: { in: ACTIVE_DRIVER_ORDER_STATUSES } },
+          select: { id: true, status: true },
+        },
+      },
+    });
+
+    const payload = sanitizeDriver(updatedDriver);
+    emitDriverAvailabilityUpdated(payload);
+    return res.status(200).json({ message: 'Driver availability updated', driver: payload });
+  } catch (err) {
+    logger.errorLog('Error updating driver availability:', err);
+    return res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update driver availability' });
+  }
+};
+
+const updateDriverPresence = async (req, res) => {
+  try {
+    const { presenceStatus } = req.body;
+    const normalizedPresence = String(presenceStatus || '').trim().toUpperCase() === 'ONLINE' ? 'ONLINE' : 'OFFLINE';
+    const driver = await getCurrentDriver(req.user.userId);
+    const now = new Date();
+    const updatedDriver = await prisma.driver.update({
+      where: { id: driver.id },
+      data: {
+        presenceStatus: normalizedPresence,
+        presenceUpdatedAt: now,
+        lastSeenAt: normalizedPresence === 'ONLINE' ? now : driver.lastSeenAt,
+      },
+      include: {
+        assignedOrders: {
+          where: { status: { in: ACTIVE_DRIVER_ORDER_STATUSES } },
+          select: { id: true, status: true },
+        },
+      },
+    });
+
+    const payload = sanitizeDriver(updatedDriver);
+    emitDriverAvailabilityUpdated(payload);
+    return res.status(200).json({ message: 'Driver presence updated', driver: payload });
+  } catch (err) {
+    logger.errorLog('Error updating driver presence:', err);
+    return res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update driver presence' });
   }
 };
 
@@ -292,26 +435,7 @@ const deleteDriver = async (req, res) => {
 
 const getDriverOrders = async (req, res) => {
   try {
-    const userId = req.user.userId;
-
-    // Get the user to get their email
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-
-    if (!user) {
-      return res.status(401).json({ error: 'User not found' });
-    }
-
-    // Find the driver record by email
-    const driver = await prisma.driver.findUnique({
-      where: { email: user.email },
-    });
-
-    if (!driver) {
-      return res.status(403).json({ error: 'Driver profile not found' });
-    }
+    const driver = await getCurrentDriver(req.user.userId);
 
     // Find all orders assigned to this driver
     const orders = await prisma.order.findMany({
@@ -352,7 +476,6 @@ const updateDriverOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     const normalizedStatus = normalizeDeliveryStatus(status);
-    const userId = req.user.userId;
 
     // Validate order ID
     if (!id || isNaN(parseInt(id))) {
@@ -364,24 +487,7 @@ const updateDriverOrderStatus = async (req, res) => {
       return res.status(400).json({ error: 'Status is required' });
     }
 
-    // Get the user to get their email
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-
-    if (!user) {
-      return res.status(401).json({ error: 'User not found' });
-    }
-
-    // Find the driver record by email
-    const driver = await prisma.driver.findUnique({
-      where: { email: user.email },
-    });
-
-    if (!driver) {
-      return res.status(403).json({ error: 'Driver profile not found' });
-    }
+    const driver = await getCurrentDriver(req.user.userId);
 
     // Find order and verify it belongs to this driver
     const order = await prisma.order.findUnique({
@@ -401,7 +507,7 @@ const updateDriverOrderStatus = async (req, res) => {
     // Update order status
     const updatedOrder = await prisma.order.update({
       where: { id: parseInt(id) },
-      data: { status: normalizedStatus },
+      data: { status: normalizedStatus, ...getStatusTimingData(normalizedStatus, order) },
       include: {
         user: {
           select: {
@@ -471,6 +577,105 @@ const updateDriverOrderStatus = async (req, res) => {
     return res.status(500).json({
       error: 'Server error while updating order status',
     });
+  }
+};
+
+const acceptDriverOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const driver = await getCurrentDriver(req.user.userId);
+
+    if (!id || isNaN(parseInt(id))) {
+      return res.status(400).json({ error: 'Valid order ID is required' });
+    }
+
+    const order = await prisma.order.findUnique({ where: { id: parseInt(id) } });
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    if (order.driverId !== driver.id) {
+      return res.status(403).json({ error: 'This order is not assigned to you' });
+    }
+    if (order.status !== 'ASSIGNED') {
+      return res.status(400).json({ error: 'Only assigned deliveries can be accepted' });
+    }
+
+    const updatedOrder = await prisma.order.update({
+      where: { id: parseInt(id) },
+      data: { status: 'ACCEPTED', acceptedAt: order.acceptedAt || new Date() },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        driver: { select: { id: true, name: true, phone: true, email: true } },
+        items: { include: { product: true } },
+      },
+    });
+
+    emitOrderUnassigned(driver.id, updatedOrder);
+    emitOrderStatusUpdated(updatedOrder);
+    emitOrderUpdated(updatedOrder);
+
+    return res.status(200).json({
+      message: 'Delivery accepted successfully',
+      order: updatedOrder,
+    });
+  } catch (err) {
+    logger.errorLog('Error accepting driver order:', err);
+    return res.status(err.statusCode || 500).json({ error: err.message || 'Server error while accepting delivery' });
+  }
+};
+
+const declineDriverOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const normalizedReason = typeof reason === 'string' ? reason.trim() : '';
+    const driver = await getCurrentDriver(req.user.userId);
+
+    if (!id || isNaN(parseInt(id))) {
+      return res.status(400).json({ error: 'Valid order ID is required' });
+    }
+    if (!normalizedReason) {
+      return res.status(400).json({ error: 'Reason is required when declining a delivery' });
+    }
+
+    const order = await prisma.order.findUnique({ where: { id: parseInt(id) } });
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    if (order.driverId !== driver.id) {
+      return res.status(403).json({ error: 'This order is not assigned to you' });
+    }
+    if (!['ASSIGNED', 'ACCEPTED'].includes(order.status)) {
+      return res.status(400).json({ error: 'Only assigned or accepted deliveries can be declined' });
+    }
+
+    const noteLine = `[Driver declined: ${driver.name}] ${normalizedReason}`;
+    const updatedOrder = await prisma.order.update({
+      where: { id: parseInt(id) },
+      data: {
+        driverId: null,
+        status: 'CONFIRMED',
+        assignedAt: null,
+        acceptedAt: null,
+        notes: order.notes ? `${order.notes}\n${noteLine}` : noteLine,
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        driver: { select: { id: true, name: true, phone: true, email: true } },
+        items: { include: { product: true } },
+      },
+    });
+
+    emitOrderStatusUpdated(updatedOrder);
+    emitOrderUpdated(updatedOrder);
+
+    return res.status(200).json({
+      message: 'Delivery declined and returned for reassignment',
+      order: updatedOrder,
+    });
+  } catch (err) {
+    logger.errorLog('Error declining driver order:', err);
+    return res.status(err.statusCode || 500).json({ error: err.message || 'Server error while declining delivery' });
   }
 };
 
@@ -618,4 +823,20 @@ const clearDriverPerformance = async (req, res) => {
   }
 };
 
-module.exports = { createDriver, createDriverWithAccount, getDrivers, updateDriver, deleteDriver, getDriverOrders, updateDriverOrderStatus, getDriverPerformance, getDriverPerformanceByDay, clearDriverPerformance };
+module.exports = {
+  createDriver,
+  createDriverWithAccount,
+  getDrivers,
+  updateDriver,
+  deleteDriver,
+  getDriverAvailability,
+  updateDriverAvailability,
+  updateDriverPresence,
+  getDriverOrders,
+  updateDriverOrderStatus,
+  acceptDriverOrder,
+  declineDriverOrder,
+  getDriverPerformance,
+  getDriverPerformanceByDay,
+  clearDriverPerformance,
+};

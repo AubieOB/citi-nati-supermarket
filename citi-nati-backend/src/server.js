@@ -32,6 +32,7 @@ const cashierRoutes = require('./routes/cashier.routes');
 const businessOperationsRoutes = require('./routes/businessOperations.routes');
 const deliveryZonesRoutes = require('./routes/deliveryZones.routes');
 const logger = require('./utils/logger');
+const { emitDriverAvailabilityUpdated } = require('./utils/socket');
 const { adminRateLimiter, posAgentRateLimiter } = require('./middleware/rateLimit.middleware');
 const mailConfig = require('./config/mailConfig');
 const { startDataRetentionScheduler } = require('./services/dataRetention.service');
@@ -233,6 +234,16 @@ async function start() {
                   });
                   if (driver) {
                     driverId = driver.id;
+                    const now = new Date();
+                    const onlineDriver = await prisma.driver.update({
+                      where: { id: driver.id },
+                      data: {
+                        presenceStatus: 'ONLINE',
+                        presenceUpdatedAt: now,
+                        lastSeenAt: now,
+                      },
+                    });
+                    emitDriverAvailabilityUpdated(onlineDriver);
                     logger.debugLog(`[Socket] Found driver record for ${email}: ${driverId}`);
                   }
                 } catch (err) {
@@ -375,6 +386,17 @@ async function start() {
       });
 
       socket.on('disconnect', () => {
+        if (socket.role === 'driver' && socket.driverId) {
+          prisma.driver.update({
+            where: { id: socket.driverId },
+            data: {
+              presenceStatus: 'OFFLINE',
+              presenceUpdatedAt: new Date(),
+            },
+          })
+            .then((driver) => emitDriverAvailabilityUpdated(driver))
+            .catch((err) => logger.debugLog(`[Socket] Could not mark driver offline: ${err.message}`));
+        }
         logger.debugLog(`[Socket] ${socket.id} disconnected`);
       });
 
