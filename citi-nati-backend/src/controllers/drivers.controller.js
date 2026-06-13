@@ -1,10 +1,20 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const { emitOrderStatusUpdated, emitOrderUpdated } = require('../utils/socket');
+const { sendDeliveryStatusEmail } = require('../utils/emailService');
 const { validateStrongPassword } = require('../utils/passwordPolicy');
 const logger = require('../utils/logger');
 
 const prisma = new PrismaClient();
+
+const normalizeDeliveryStatus = (status) => {
+  const normalized = String(status || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+  const aliases = {
+    OUT_FOR_DELIVERY: 'IN_TRANSIT',
+    FAILED_DELIVERY: 'FAILED',
+  };
+  return aliases[normalized] || normalized;
+};
 
 /**
  * Create a new driver WITH user account (can login)
@@ -341,6 +351,7 @@ const updateDriverOrderStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
+    const normalizedStatus = normalizeDeliveryStatus(status);
     const userId = req.user.userId;
 
     // Validate order ID
@@ -349,7 +360,7 @@ const updateDriverOrderStatus = async (req, res) => {
     }
 
     // Validate status
-    if (!status) {
+    if (!normalizedStatus) {
       return res.status(400).json({ error: 'Status is required' });
     }
 
@@ -390,12 +401,20 @@ const updateDriverOrderStatus = async (req, res) => {
     // Update order status
     const updatedOrder = await prisma.order.update({
       where: { id: parseInt(id) },
-      data: { status },
+      data: { status: normalizedStatus },
       include: {
         user: {
           select: {
             id: true,
             name: true,
+            email: true,
+          },
+        },
+        driver: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
             email: true,
           },
         },
@@ -406,6 +425,36 @@ const updateDriverOrderStatus = async (req, res) => {
         },
       },
     });
+
+    if (['IN_TRANSIT', 'DELIVERED', 'FAILED'].includes(normalizedStatus)) {
+      try {
+        await sendDeliveryStatusEmail(
+          updatedOrder.user.email,
+          updatedOrder.user.name,
+          {
+            id: updatedOrder.id,
+            totalPrice: updatedOrder.total,
+            deliveryAddress: updatedOrder.deliveryAddress,
+            items: updatedOrder.items?.length || 0,
+            driver: updatedOrder.driver
+              ? {
+                  name: updatedOrder.driver.name,
+                  phone: updatedOrder.driver.phone,
+                  email: updatedOrder.driver.email,
+                }
+              : {
+                  name: driver.name,
+                  phone: driver.phone,
+                  email: driver.email,
+                },
+          },
+          normalizedStatus,
+        );
+        logger.debugLog(`[Email] Driver status email sent for order ${updatedOrder.id} (${normalizedStatus})`);
+      } catch (emailErr) {
+        logger.errorLog('[Email] Failed to send driver delivery status email:', emailErr.message);
+      }
+    }
 
     // Emit order status updated event to admins (non-blocking)
     emitOrderStatusUpdated(updatedOrder);

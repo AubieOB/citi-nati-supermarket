@@ -13,6 +13,15 @@ const logger = require('../utils/logger');
 
 const prisma = new PrismaClient();
 
+const normalizeDeliveryStatus = (status) => {
+  const normalized = String(status || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+  const aliases = {
+    OUT_FOR_DELIVERY: 'IN_TRANSIT',
+    FAILED_DELIVERY: 'FAILED',
+  };
+  return aliases[normalized] || normalized;
+};
+
 const createOrder = async (req, res) => {
   try {
     // Get authenticated user id
@@ -245,6 +254,7 @@ const updateOrderStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
+    const normalizedStatus = normalizeDeliveryStatus(status);
     const userId = req.user.userId;
     const userRole = req.user.role;
 
@@ -254,7 +264,7 @@ const updateOrderStatus = async (req, res) => {
     }
 
     // Validate status is provided
-    if (!status) {
+    if (!normalizedStatus) {
       return res.status(400).json({ error: 'Status is required' });
     }
 
@@ -299,7 +309,7 @@ const updateOrderStatus = async (req, res) => {
     // Update order status
     const updatedOrder = await prisma.order.update({
       where: { id: parseInt(id) },
-      data: { status },
+      data: { status: normalizedStatus },
       include: {
         user: {
           select: { id: true, name: true, email: true }
@@ -312,7 +322,7 @@ const updateOrderStatus = async (req, res) => {
     });
 
     // Send delivery status emails for significant status changes
-    if (['IN_TRANSIT', 'DELIVERED', 'FAILED'].includes(status)) {
+    if (['IN_TRANSIT', 'DELIVERED', 'FAILED'].includes(normalizedStatus)) {
       try {
         const orderDetails = {
           id: updatedOrder.id,
@@ -332,10 +342,10 @@ const updateOrderStatus = async (req, res) => {
           updatedOrder.user.email,
           updatedOrder.user.name,
           orderDetails,
-          status
+          normalizedStatus
         );
 
-        logger.debugLog(`[Email] Delivery status email sent for order ${updatedOrder.id} (${status})`);
+        logger.debugLog(`[Email] Delivery status email sent for order ${updatedOrder.id} (${normalizedStatus})`);
       } catch (emailErr) {
         logger.errorLog(`[Email] ❌ Failed to send delivery status email:`, emailErr.message);
         // Don't fail the status update if email fails
@@ -343,7 +353,7 @@ const updateOrderStatus = async (req, res) => {
     }
 
     // Create notification if order is completed
-    if (status === 'COMPLETED' || status === 'DELIVERED') {
+    if (normalizedStatus === 'COMPLETED' || normalizedStatus === 'DELIVERED') {
       await notifyOrderCompleted(updatedOrder);
     }
 
