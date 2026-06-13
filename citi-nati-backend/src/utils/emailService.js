@@ -3,6 +3,8 @@
  * All templates share one simple Citi-Nati branded shell.
  */
 
+const fs = require('fs');
+const path = require('path');
 const mailProvider = require('../services/mailProvider');
 const logger = require('../utils/logger');
 
@@ -19,24 +21,8 @@ const BRAND = {
   danger: '#C62828',
 };
 
-const getPublicBaseUrl = () => {
-  const value =
-    process.env.EMAIL_ASSET_BASE_URL ||
-    process.env.PUBLIC_BASE_URL ||
-    process.env.BACKEND_PUBLIC_URL ||
-    process.env.API_BASE_URL ||
-    process.env.RENDER_EXTERNAL_URL ||
-    '';
-  return String(value).replace(/\/+$/, '');
-};
-
-const getLogoUrl = () => {
-  if (process.env.EMAIL_LOGO_URL) {
-    return process.env.EMAIL_LOGO_URL;
-  }
-  const baseUrl = getPublicBaseUrl();
-  return baseUrl ? `${baseUrl}/uploads/branding/citi-nati-full-logo.png` : '';
-};
+const LOGO_CID = 'citi-nati-full-logo@citi-nati';
+const LOGO_PATH = path.join(__dirname, '..', '..', 'uploads', 'branding', 'citi-nati-full-logo.original.png');
 
 const escapeHtml = (value) =>
   String(value ?? '')
@@ -123,10 +109,7 @@ const renderItemsTable = (items = []) => {
 };
 
 const renderTemplate = ({ title, intro, body = '', accent = BRAND.blue }) => {
-  const logoUrl = getLogoUrl();
-  const logo = logoUrl
-    ? `<img src="${escapeHtml(logoUrl)}" alt="Citi-Nati Supermarket" width="220" style="display:block;width:220px;max-width:80%;height:auto;margin:0 auto;" />`
-    : `<div style="font-size:22px;font-weight:900;color:${BRAND.blue};">Citi-Nati Supermarket</div>`;
+  const logo = `<img src="cid:${LOGO_CID}" alt="Citi-Nati Supermarket" width="360" style="display:block;width:360px;max-width:94%;height:auto;margin:0 auto;" />`;
 
   return `
     <!doctype html>
@@ -171,7 +154,8 @@ const renderTemplate = ({ title, intro, body = '', accent = BRAND.blue }) => {
 const sendEmail = async (to, subject, html) => {
   try {
     const provider = mailProvider.getMailProvider();
-    const result = await provider.send({ to, subject, html });
+    const attachments = getLogoAttachment();
+    const result = await provider.send({ to, subject, html, attachments });
 
     logger.infoLog(`Email sent successfully to: ${to}`, {
       subject,
@@ -196,6 +180,29 @@ const sendEmail = async (to, subject, html) => {
       errorCode: err.code || 'EMAIL_SEND_FAILED',
       userMessage: safeUserMessage,
     };
+  }
+};
+
+const getLogoAttachment = () => {
+  try {
+    if (!fs.existsSync(LOGO_PATH)) {
+      logger.warnLog('[EMAIL] Citi-Nati email logo asset is missing', { path: LOGO_PATH });
+      return [];
+    }
+
+    return [
+      {
+        filename: 'citi-nati-full-logo.original.png',
+        path: LOGO_PATH,
+        content: fs.readFileSync(LOGO_PATH).toString('base64'),
+        contentType: 'image/png',
+        cid: LOGO_CID,
+        disposition: 'inline',
+      },
+    ];
+  } catch (err) {
+    logger.warnLog('[EMAIL] Failed to attach Citi-Nati email logo', { error: err.message });
+    return [];
   }
 };
 

@@ -101,6 +101,15 @@ class SmtpProvider {
       ...(options.text && { text: options.text }),
       ...(options.cc && { cc: options.cc }),
       ...(options.bcc && { bcc: options.bcc }),
+      ...(options.attachments && {
+        attachments: options.attachments.map((attachment) => ({
+          filename: attachment.filename,
+          path: attachment.path,
+          contentType: attachment.contentType,
+          cid: attachment.cid,
+          disposition: attachment.disposition || 'inline',
+        })),
+      }),
     };
 
     try {
@@ -186,6 +195,15 @@ class SendgridProvider {
       ...(options.text && { text: options.text }),
       ...(options.cc && { cc: options.cc }),
       ...(options.bcc && { bcc: options.bcc }),
+      ...(options.attachments && {
+        attachments: options.attachments.map((attachment) => ({
+          content: attachment.content,
+          filename: attachment.filename,
+          type: attachment.contentType,
+          disposition: attachment.disposition || 'inline',
+          content_id: attachment.cid,
+        })),
+      }),
     };
 
     try {
