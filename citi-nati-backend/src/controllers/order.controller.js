@@ -304,6 +304,9 @@ const updateOrderStatus = async (req, res) => {
         user: {
           select: { id: true, name: true, email: true }
         },
+        driver: {
+          select: { id: true, name: true, phone: true, email: true }
+        },
         items: true
       }
     });
@@ -316,6 +319,13 @@ const updateOrderStatus = async (req, res) => {
           totalPrice: updatedOrder.total,
           deliveryAddress: updatedOrder.deliveryAddress,
           items: updatedOrder.items?.length || 0,
+          driver: updatedOrder.driver
+            ? {
+                name: updatedOrder.driver.name,
+                phone: updatedOrder.driver.phone,
+                email: updatedOrder.driver.email,
+              }
+            : null,
         };
 
         await sendDeliveryStatusEmail(
@@ -408,7 +418,7 @@ const assignDriverToOrder = async (req, res) => {
     try {
       const driverInfo = {
         name: driver.name,
-        phone: driver.phoneNumber,
+        phone: driver.phone,
         vehicle: driver.vehicleInfo,
       };
 

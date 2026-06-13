@@ -47,6 +47,42 @@ const isSessionExpiryError = (error) => {
   return SESSION_EXPIRY_PATTERNS.some((pattern) => pattern.test(message));
 };
 
+export const getFriendlyApiErrorMessage = (error) => {
+  const status = error?.response?.status;
+  const rawMessage = String(error?.response?.data?.error || error?.response?.data?.message || error?.message || '').trim();
+  const lowerMessage = rawMessage.toLowerCase();
+
+  if (!error?.response) {
+    return 'Unable to connect. Please check your internet connection and try again.';
+  }
+  if (status === 401) {
+    return 'Incorrect email or password. Please try again.';
+  }
+  if (status === 403) {
+    return 'Your account does not have permission to perform this action.';
+  }
+  if (status === 429) {
+    return 'Too many attempts. Please wait a few minutes and try again.';
+  }
+  if (status >= 500) {
+    return 'Something went wrong. Please try again later.';
+  }
+  if (lowerMessage.includes('network error') || lowerMessage.includes('timeout')) {
+    return 'Unable to connect. Please check your internet connection and try again.';
+  }
+  if (rawMessage && !/axioserror|status code|\b40[013]\b|\b429\b|\b500\b|stack/i.test(rawMessage)) {
+    return rawMessage;
+  }
+  return 'An unexpected error occurred. Please try again.';
+};
+
+const applyFriendlyApiErrorMessage = (error) => {
+  const friendlyMessage = getFriendlyApiErrorMessage(error);
+  error.userMessage = friendlyMessage;
+  error.message = friendlyMessage;
+  return error;
+};
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
   withCredentials: true,
@@ -67,7 +103,7 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
-    return Promise.reject(error);
+    return Promise.reject(applyFriendlyApiErrorMessage(error));
   }
 );
 
@@ -121,7 +157,7 @@ api.interceptors.response.use(
           }
         }
 
-        return Promise.reject(refreshError);
+        return Promise.reject(applyFriendlyApiErrorMessage(refreshError));
       } finally {
         refreshPromise = null;
       }
@@ -133,7 +169,7 @@ api.interceptors.response.use(
       tokenStorage.clear();
     }
 
-    return Promise.reject(error);
+    return Promise.reject(applyFriendlyApiErrorMessage(error));
   }
 );
 

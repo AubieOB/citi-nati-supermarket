@@ -1,26 +1,177 @@
 /**
- * Email Service - Handles all email operations using provider abstraction
- * Supports SMTP, SendGrid, and other providers via unified interface
- * Centralized email sending with professional templates
+ * Email Service - Handles all customer email operations using provider abstraction.
+ * All templates share one simple Citi-Nati branded shell.
  */
 
 const mailProvider = require('../services/mailProvider');
 const logger = require('../utils/logger');
 
+const BRAND = {
+  green: '#12B600',
+  greenDark: '#078A00',
+  blue: '#0638DC',
+  blueDark: '#052AA6',
+  text: '#142033',
+  muted: '#536278',
+  border: '#E0E7F0',
+  background: '#F7F9FC',
+  surface: '#FFFFFF',
+  danger: '#C62828',
+};
+
+const getPublicBaseUrl = () => {
+  const value =
+    process.env.EMAIL_ASSET_BASE_URL ||
+    process.env.PUBLIC_BASE_URL ||
+    process.env.BACKEND_PUBLIC_URL ||
+    process.env.API_BASE_URL ||
+    process.env.RENDER_EXTERNAL_URL ||
+    '';
+  return String(value).replace(/\/+$/, '');
+};
+
+const getLogoUrl = () => {
+  if (process.env.EMAIL_LOGO_URL) {
+    return process.env.EMAIL_LOGO_URL;
+  }
+  const baseUrl = getPublicBaseUrl();
+  return baseUrl ? `${baseUrl}/uploads/branding/citi-nati-full-logo.png` : '';
+};
+
+const escapeHtml = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const formatMoney = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? `MWK ${numeric.toLocaleString()}` : 'MWK 0';
+};
+
+const formatDate = (value = new Date()) => {
+  const date = value ? new Date(value) : new Date();
+  return Number.isNaN(date.getTime()) ? new Date().toLocaleDateString() : date.toLocaleDateString();
+};
+
+const normalizeItem = (item) => {
+  const quantity = Number(item.quantity ?? 0);
+  const unitPrice = Number(item.unitPrice ?? item.price ?? 0);
+  const subtotal = Number(item.subtotal ?? item.total ?? quantity * unitPrice);
+  return {
+    name: item.name || item.productName || item.product?.name || 'Item',
+    quantity,
+    unitPrice,
+    subtotal,
+  };
+};
+
+const renderInfoRows = (rows) =>
+  rows
+    .filter((row) => row.value !== undefined && row.value !== null && row.value !== '')
+    .map(
+      (row) => `
+        <tr>
+          <td style="padding:8px 0;color:${BRAND.muted};font-size:13px;width:38%;">${escapeHtml(row.label)}</td>
+          <td style="padding:8px 0;color:${BRAND.text};font-size:13px;font-weight:700;">${escapeHtml(row.value)}</td>
+        </tr>
+      `,
+    )
+    .join('');
+
+const renderInfoBox = (rows) => `
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.surface};border:1px solid ${BRAND.border};border-radius:8px;margin:18px 0;padding:6px 16px;">
+    ${renderInfoRows(rows)}
+  </table>
+`;
+
+const renderItemsTable = (items = []) => {
+  const rows = items.map(normalizeItem);
+
+  if (!rows.length) {
+    return '';
+  }
+
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:18px 0;background:${BRAND.surface};border:1px solid ${BRAND.border};border-radius:8px;overflow:hidden;">
+      <thead>
+        <tr style="background:${BRAND.blue};">
+          <th align="left" style="padding:10px;color:#ffffff;font-size:12px;">Product</th>
+          <th align="center" style="padding:10px;color:#ffffff;font-size:12px;">Qty</th>
+          <th align="right" style="padding:10px;color:#ffffff;font-size:12px;">Unit Price</th>
+          <th align="right" style="padding:10px;color:#ffffff;font-size:12px;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map(
+            (item) => `
+              <tr>
+                <td style="padding:10px;border-bottom:1px solid ${BRAND.border};color:${BRAND.text};font-size:13px;">${escapeHtml(item.name)}</td>
+                <td align="center" style="padding:10px;border-bottom:1px solid ${BRAND.border};color:${BRAND.text};font-size:13px;">${escapeHtml(item.quantity)}</td>
+                <td align="right" style="padding:10px;border-bottom:1px solid ${BRAND.border};color:${BRAND.text};font-size:13px;">${escapeHtml(formatMoney(item.unitPrice))}</td>
+                <td align="right" style="padding:10px;border-bottom:1px solid ${BRAND.border};color:${BRAND.text};font-size:13px;font-weight:700;">${escapeHtml(formatMoney(item.subtotal))}</td>
+              </tr>
+            `,
+          )
+          .join('')}
+      </tbody>
+    </table>
+  `;
+};
+
+const renderTemplate = ({ title, intro, body = '', accent = BRAND.blue }) => {
+  const logoUrl = getLogoUrl();
+  const logo = logoUrl
+    ? `<img src="${escapeHtml(logoUrl)}" alt="Citi-Nati Supermarket" width="220" style="display:block;width:220px;max-width:80%;height:auto;margin:0 auto;" />`
+    : `<div style="font-size:22px;font-weight:900;color:${BRAND.blue};">Citi-Nati Supermarket</div>`;
+
+  return `
+    <!doctype html>
+    <html>
+      <body style="margin:0;padding:0;background:${BRAND.background};font-family:Arial,Helvetica,sans-serif;color:${BRAND.text};">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.background};padding:24px 12px;">
+          <tr>
+            <td align="center">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background:${BRAND.surface};border:1px solid ${BRAND.border};border-radius:8px;overflow:hidden;">
+                <tr>
+                  <td style="padding:24px 24px 12px;text-align:center;">
+                    ${logo}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 24px 26px;">
+                    <div style="height:4px;background:${accent};border-radius:999px;margin:10px 0 22px;"></div>
+                    <h1 style="margin:0 0 12px;color:${BRAND.text};font-size:22px;line-height:1.3;">${escapeHtml(title)}</h1>
+                    ${intro ? `<p style="margin:0 0 16px;color:${BRAND.muted};font-size:15px;line-height:1.65;">${intro}</p>` : ''}
+                    ${body}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:18px 24px;background:#F0F5FF;border-top:1px solid ${BRAND.border};text-align:center;">
+                    <p style="margin:0;color:${BRAND.muted};font-size:12px;line-height:1.5;">&copy; ${new Date().getFullYear()} Citi-Nati Supermarket. All rights reserved.</p>
+                    <p style="margin:4px 0 0;color:${BRAND.muted};font-size:12px;line-height:1.5;">This is an automated email. Please do not reply.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `;
+};
+
 /**
  * Generic Email Sending Function
- * All emails go through this function
- * Provider is selected via MAIL_PROVIDER environment variable
+ * Provider is selected via MAIL_PROVIDER environment variable.
  */
 const sendEmail = async (to, subject, html) => {
   try {
     const provider = mailProvider.getMailProvider();
-    
-    const result = await provider.send({
-      to,
-      subject,
-      html,
-    });
+    const result = await provider.send({ to, subject, html });
 
     logger.infoLog(`Email sent successfully to: ${to}`, {
       subject,
@@ -48,39 +199,25 @@ const sendEmail = async (to, subject, html) => {
   }
 };
 
-/**
- * Send Email Verification Code (Registration)
- * Code expires in 10 minutes
- */
+const renderCodeBox = (label, code, expiresText) => `
+  <div style="background:${BRAND.surface};border:2px solid ${BRAND.blue};padding:20px;text-align:center;border-radius:8px;margin:20px 0;">
+    <p style="color:${BRAND.muted};margin:0;font-size:12px;">${escapeHtml(label)}</p>
+    <p style="color:${BRAND.blue};font-size:34px;font-weight:900;margin:10px 0;letter-spacing:5px;">${escapeHtml(code)}</p>
+    <p style="color:${BRAND.muted};margin:10px 0 0;font-size:12px;">${escapeHtml(expiresText)}</p>
+  </div>
+`;
+
 const sendVerificationEmail = async (email, code) => {
   try {
     logger.debugLog('Sending verification email', { email });
-
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #5B4B8A; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="color: white; margin: 0;">Citi-Nati Supermarket</h1>
-        </div>
-        <div style="padding: 30px; background-color: #f9f9f9;">
-          <h2 style="color: #333;">Verify Your Email</h2>
-          <p style="color: #666; font-size: 16px; line-height: 1.6;">
-            Thank you for registering with Citi-Nati Supermarket! Use the code below to verify your email address and complete your registration.
-          </p>
-          <div style="background-color: #fff; border: 2px solid #5B4B8A; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
-            <p style="color: #999; margin: 0; font-size: 12px;">Verification Code</p>
-            <p style="color: #5B4B8A; font-size: 36px; font-weight: bold; margin: 10px 0; letter-spacing: 5px;">${code}</p>
-            <p style="color: #999; margin: 10px 0; font-size: 12px;">This code expires in 10 minutes</p>
-          </div>
-          <p style="color: #666; font-size: 14px;">
-            If you didn't register for this account, please ignore this email or contact support.
-          </p>
-        </div>
-        <div style="background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #999;">
-          <p style="margin: 0;">© 2026 Citi-Nati Supermarket. All rights reserved.</p>
-          <p style="margin: 5px 0 0 0;">This is an automated email, please do not reply.</p>
-        </div>
-      </div>
-    `;
+    const html = renderTemplate({
+      title: 'Verify Your Email',
+      intro: 'Thank you for registering with Citi-Nati Supermarket. Use the code below to verify your email address and complete your registration.',
+      body: `
+        ${renderCodeBox('Verification Code', code, 'This code expires in 10 minutes.')}
+        <p style="color:${BRAND.muted};font-size:13px;line-height:1.6;">If you did not register for this account, you can safely ignore this email or contact support.</p>
+      `,
+    });
 
     return await sendEmail(email, 'Verify Your Citi-Nati Account', html);
   } catch (err) {
@@ -89,39 +226,17 @@ const sendVerificationEmail = async (email, code) => {
   }
 };
 
-/**
- * Send Password Reset Code
- * Code expires in 15 minutes
- */
 const sendPasswordResetEmail = async (email, code) => {
   try {
     logger.debugLog('Sending password reset email', { email });
-
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #5B4B8A; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="color: white; margin: 0;">Citi-Nati Supermarket</h1>
-        </div>
-        <div style="padding: 30px; background-color: #f9f9f9;">
-          <h2 style="color: #333;">Reset Your Password</h2>
-          <p style="color: #666; font-size: 16px; line-height: 1.6;">
-            We received a request to reset your Citi-Nati Supermarket account password. Use the code below to reset your password.
-          </p>
-          <div style="background-color: #fff; border: 2px solid #5B4B8A; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
-            <p style="color: #999; margin: 0; font-size: 12px;">Reset Code</p>
-            <p style="color: #5B4B8A; font-size: 36px; font-weight: bold; margin: 10px 0; letter-spacing: 5px;">${code}</p>
-            <p style="color: #999; margin: 10px 0; font-size: 12px;">This code expires in 15 minutes</p>
-          </div>
-          <p style="color: #666; font-size: 14px;">
-            If you didn't request a password reset, please ignore this email or contact support immediately.
-          </p>
-        </div>
-        <div style="background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #999;">
-          <p style="margin: 0;">© 2026 Citi-Nati Supermarket. All rights reserved.</p>
-          <p style="margin: 5px 0 0 0;">This is an automated email, please do not reply.</p>
-        </div>
-      </div>
-    `;
+    const html = renderTemplate({
+      title: 'Reset Your Password',
+      intro: 'We received a request to reset your Citi-Nati Supermarket account password. Use the code below to continue.',
+      body: `
+        ${renderCodeBox('Reset Code', code, 'This code expires in 15 minutes.')}
+        <p style="color:${BRAND.muted};font-size:13px;line-height:1.6;">If you did not request a password reset, you can safely ignore this email or contact support.</p>
+      `,
+    });
 
     return await sendEmail(email, 'Reset Your Citi-Nati Password', html);
   } catch (err) {
@@ -130,66 +245,24 @@ const sendPasswordResetEmail = async (email, code) => {
   }
 };
 
-/**
- * Send Order Confirmation Email
- * Sent when order is successfully placed
- */
-const sendOrderConfirmationEmail = async (email, userName, order, products) => {
+const sendOrderConfirmationEmail = async (email, userName, order, products = []) => {
   try {
     logger.debugLog('Sending order confirmation email', { email, orderId: order.id });
-
-    const productRows = products
-      .map(
-        (p) => `
-      <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${p.name}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">${p.quantity}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">MWK ${(p.price * p.quantity).toLocaleString()}</td>
-      </tr>
-    `,
-      )
-      .join('');
-
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #5B4B8A; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="color: white; margin: 0;">Citi-Nati Supermarket</h1>
-        </div>
-        <div style="padding: 30px; background-color: #f9f9f9;">
-          <h2 style="color: #333;">Order Confirmation</h2>
-          <p style="color: #666;">Hi ${userName},</p>
-          <p style="color: #666; font-size: 16px; line-height: 1.6;">
-            Thank you for your order! We've received it and will process it shortly.
-          </p>
-          <div style="background-color: #fff; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p style="color: #999; font-size: 12px; margin: 0;"><strong>Order Number:</strong> #${order.id}</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Order Date:</strong> ${new Date().toLocaleDateString()}</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Delivery Address:</strong> ${order.deliveryAddress}</p>
-          </div>
-          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-            <thead>
-              <tr style="background-color: #5B4B8A; color: white;">
-                <th style="padding: 10px; text-align: left;">Product</th>
-                <th style="padding: 10px; text-align: center;">Qty</th>
-                <th style="padding: 10px; text-align: right;">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${productRows}
-            </tbody>
-          </table>
-          <div style="text-align: right; padding-top: 15px; border-top: 2px solid #5B4B8A;">
-            <p style="color: #333; font-size: 18px; font-weight: bold;"><strong>Total: MWK ${order.total.toLocaleString()}</strong></p>
-          </div>
-          <p style="color: #666; font-size: 14px; margin-top: 20px;">
-            We'll send you another email when your order is out for delivery. You can track your order status in your account dashboard.
-          </p>
-        </div>
-        <div style="background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #999;">
-          <p style="margin: 0;">© 2026 Citi-Nati Supermarket. All rights reserved.</p>
-        </div>
-      </div>
-    `;
+    const total = order.finalTotalAmount ?? order.total;
+    const html = renderTemplate({
+      title: 'Order Confirmed',
+      intro: `Hi ${escapeHtml(userName)}, your order has been received and is being processed.`,
+      body: `
+        ${renderInfoBox([
+          { label: 'Order Number', value: `#${order.id}` },
+          { label: 'Order Date', value: formatDate(order.createdAt || new Date()) },
+          { label: 'Delivery Address', value: order.deliveryAddress },
+        ])}
+        ${renderItemsTable(products)}
+        <p style="text-align:right;color:${BRAND.text};font-size:17px;font-weight:900;margin:16px 0;">Total: ${escapeHtml(formatMoney(total))}</p>
+        <p style="color:${BRAND.muted};font-size:13px;line-height:1.6;">We will let you know when delivery begins.</p>
+      `,
+    });
 
     return await sendEmail(email, `Order Confirmation - #${order.id}`, html);
   } catch (err) {
@@ -198,72 +271,25 @@ const sendOrderConfirmationEmail = async (email, userName, order, products) => {
   }
 };
 
-/**
- * Send Payment Confirmation Email
- * Sent when payment is successfully processed
- */
 const sendPaymentConfirmationEmail = async (email, userName, paymentDetails) => {
   try {
     logger.debugLog('Sending payment confirmation email', { email, orderId: paymentDetails.orderId });
-
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #5B4B8A; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="color: white; margin: 0;">Citi-Nati Supermarket</h1>
-        </div>
-        <div style="padding: 30px; background-color: #f9f9f9;">
-          <h2 style="color: #333;">Payment Confirmed</h2>
-          <p style="color: #666;">Hi ${userName},</p>
-          <p style="color: #666; font-size: 16px; line-height: 1.6;">
-            Your payment has been successfully processed. Your order is being prepared.
-          </p>
-          <div style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p style="color: #155724; margin: 0;">✓ Payment Received</p>
-          </div>
-          
-          <h3 style="color: #333; margin-top: 20px; margin-bottom: 10px;">Order Summary</h3>
-          <div style="background-color: #fff; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #e0e0e0;">
-            <p style="color: #999; font-size: 12px; margin: 0;"><strong>Order ID:</strong> #${paymentDetails.orderId || 'N/A'}</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Payment Reference:</strong> ${paymentDetails.reference || 'N/A'}</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Amount Paid:</strong> MWK ${paymentDetails.amount?.toLocaleString() || 'N/A'}</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Status:</strong> PAID</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Delivery Address:</strong> ${paymentDetails.deliveryAddress || 'N/A'}</p>
-          </div>
-
-          <h3 style="color: #333; margin-top: 20px; margin-bottom: 10px;">Order Items</h3>
-          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-            <thead>
-              <tr style="background-color: #5B4B8A; color: white;">
-                <th style="padding: 10px; text-align: left; font-size: 12px;">Product</th>
-                <th style="padding: 10px; text-align: center; font-size: 12px;">Qty</th>
-                <th style="padding: 10px; text-align: right; font-size: 12px;">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${paymentDetails.items && paymentDetails.items.length > 0 ? paymentDetails.items.map(item => `
-                <tr style="border-bottom: 1px solid #ddd;">
-                  <td style="padding: 10px; font-size: 12px; color: #333;">${item.productName} </td>
-                  <td style="padding: 10px; text-align: center; font-size: 12px; color: #333;">${item.quantity}</td>
-                  <td style="padding: 10px; text-align: right; font-size: 12px; color: #333;">MWK ${(item.total).toLocaleString()}</td>
-                </tr>
-              `).join('') : '<tr><td colspan="3" style="padding: 10px; text-align: center; color: #999;">No items</td></tr>'}
-            </tbody>
-          </table>
-
-          <div style="text-align: right; padding-top: 15px; border-top: 2px solid #e0e0e0;">
-            <p style="color: #333; font-size: 14px; margin: 0;"><strong>Grand Total: MWK ${paymentDetails.amount?.toLocaleString() || 'N/A'}</strong></p>
-          </div>
-
-          <p style="color: #666; font-size: 14px; margin-top: 20px;">
-            You'll receive another email when your order is assigned to a driver. You can track your order status in your account dashboard.
-          </p>
-        </div>
-        <div style="background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #999;">
-          <p style="margin: 0;">© 2026 Citi-Nati Supermarket. All rights reserved.</p>
-        </div>
-      </div>
-    `;
+    const html = renderTemplate({
+      title: 'Payment Confirmed',
+      intro: `Hi ${escapeHtml(userName)}, your payment has been received. Your order is being prepared.`,
+      body: `
+        ${renderInfoBox([
+          { label: 'Order Number', value: `#${paymentDetails.orderId || 'N/A'}` },
+          { label: 'Payment Reference', value: paymentDetails.reference || 'N/A' },
+          { label: 'Amount Paid', value: formatMoney(paymentDetails.amount) },
+          { label: 'Payment Status', value: 'Paid' },
+          { label: 'Delivery Address', value: paymentDetails.deliveryAddress || 'N/A' },
+        ])}
+        ${renderItemsTable(paymentDetails.items || [])}
+        <p style="color:${BRAND.muted};font-size:13px;line-height:1.6;">You can track your order from your Citi-Nati account.</p>
+      `,
+      accent: BRAND.green,
+    });
 
     return await sendEmail(email, 'Payment Confirmation', html);
   } catch (err) {
@@ -272,170 +298,128 @@ const sendPaymentConfirmationEmail = async (email, userName, paymentDetails) => 
   }
 };
 
-/**
- * Send Driver Assigned Email
- * Sent when a driver is assigned to the order
- */
+const getDriverPhone = (driverInfo = {}) => {
+  const phone = driverInfo.phone || driverInfo.phoneNumber || driverInfo.mobile || driverInfo.user?.phone;
+  return phone ? String(phone) : 'Phone not provided';
+};
+
 const sendDriverAssignedEmail = async (email, userName, driverInfo, orderDetails) => {
   try {
     logger.debugLog('Sending driver assigned email', { email, orderId: orderDetails.id });
+    const html = renderTemplate({
+      title: 'Driver Assigned to Your Order',
+      intro: `Hi ${escapeHtml(userName)}, a driver has been assigned to your order. Delivery will begin shortly.`,
+      body: `
+        ${renderInfoBox([
+          { label: 'Order Number', value: `#${orderDetails.id}` },
+          { label: 'Delivery Status', value: 'Driver assigned' },
+          { label: 'Driver Name', value: driverInfo.name || 'Driver assigned' },
+          { label: 'Driver Phone', value: getDriverPhone(driverInfo) },
+          { label: 'Delivery Address', value: orderDetails.deliveryAddress },
+        ])}
+        <p style="color:${BRAND.muted};font-size:13px;line-height:1.6;">We will send another update when your driver starts delivery.</p>
+      `,
+    });
 
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #5B4B8A; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="color: white; margin: 0;">Citi-Nati Supermarket</h1>
-        </div>
-        <div style="padding: 30px; background-color: #f9f9f9;">
-          <h2 style="color: #333;">Your Order is On The Way!</h2>
-          <p style="color: #666;">Hi ${userName},</p>
-          <p style="color: #666; font-size: 16px; line-height: 1.6;">
-            Great news! Your order has been assigned to a driver and is on its way to you.
-          </p>
-          <div style="background-color: #fff; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p style="color: #999; font-size: 12px; margin: 0;"><strong>Driver Name:</strong> ${driverInfo.name || 'N/A'}</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Driver Phone:</strong> ${driverInfo.phone || 'N/A'}</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Order ID:</strong> #${orderDetails.id}</p>
-          </div>
-          <p style="color: #666; font-size: 14px;">
-            You'll receive another notification when your order is about to arrive.
-          </p>
-        </div>
-        <div style="background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #999;">
-          <p style="margin: 0;">© 2026 Citi-Nati Supermarket. All rights reserved.</p>
-        </div>
-      </div>
-    `;
-
-    return await sendEmail(email, 'Your Order is On The Way!', html);
+    return await sendEmail(email, 'Driver Assigned to Your Order', html);
   } catch (err) {
     logger.errorLog('Error in sendDriverAssignedEmail', { error: err.message, email });
     return { success: false, error: err.message };
   }
 };
 
-/**
- * Send Delivery Status Email
- * Sent when order is marked as delivered
- */
+const deliveryStatusCopy = {
+  in_transit: {
+    subject: 'Your Order Is On The Way',
+    title: 'Your Order Is On The Way',
+    message: 'Your driver has started delivery and is on the way to your address.',
+    status: 'Out for delivery',
+    accent: BRAND.blue,
+  },
+  delivered: {
+    subject: 'Order Delivered Successfully',
+    title: 'Order Delivered Successfully',
+    message: 'Your order has been delivered successfully. Thank you for shopping with Citi-Nati.',
+    status: 'Delivered',
+    accent: BRAND.green,
+  },
+  failed: {
+    subject: 'Delivery Update for Your Order',
+    title: 'Delivery Update',
+    message: 'We could not complete this delivery. Our team will review the order and follow up.',
+    status: 'Delivery issue reported',
+    accent: BRAND.danger,
+  },
+  cancelled: {
+    subject: 'Order Cancelled',
+    title: 'Order Cancelled',
+    message: 'Your order has been cancelled. If you have questions, please contact support.',
+    status: 'Cancelled',
+    accent: BRAND.danger,
+  },
+};
+
 const sendDeliveryStatusEmail = async (email, userName, orderDetails, status) => {
   try {
     logger.debugLog('Sending delivery status email', { email, orderId: orderDetails.id, status });
-
-    const statusMessages = {
-      delivered: 'Your Order Has Been Delivered',
-      in_transit: 'Your Order is On The Way',
-      cancelled: 'Your Order Has Been Cancelled',
+    const normalizedStatus = String(status || '').toLowerCase();
+    const copy = deliveryStatusCopy[normalizedStatus] || {
+      subject: 'Order Status Updated',
+      title: 'Order Status Updated',
+      message: 'Your order status has been updated.',
+      status: status || 'Updated',
+      accent: BRAND.blue,
     };
 
-    const subject = statusMessages[status?.toLowerCase()] || `Order Update - ${status}`;
-    const isDelivered = status?.toLowerCase() === 'delivered';
-    const frontendUrl = process.env.FRONTEND_URL || (process.env.RENDER_EXTERNAL_URL ? process.env.RENDER_EXTERNAL_URL.replace(':5000', ':3000') : 'http://localhost:3000');
-    const dashboardLink = `${frontendUrl}/my-orders`;
+    const frontendUrl = process.env.FRONTEND_URL || (process.env.RENDER_EXTERNAL_URL ? process.env.RENDER_EXTERNAL_URL.replace(':5000', ':3000') : '');
+    const dashboardLink = frontendUrl ? `${frontendUrl.replace(/\/+$/, '')}/my-orders` : '';
+    const driver = orderDetails.driver || {};
+    const html = renderTemplate({
+      title: copy.title,
+      intro: `Hi ${escapeHtml(userName)}, ${escapeHtml(copy.message)}`,
+      body: `
+        ${renderInfoBox([
+          { label: 'Order Number', value: `#${orderDetails.id}` },
+          { label: 'Delivery Status', value: copy.status },
+          { label: 'Delivery Address', value: orderDetails.deliveryAddress || 'N/A' },
+          { label: 'Driver Name', value: driver.name },
+          { label: 'Driver Phone', value: driver.name ? getDriverPhone(driver) : undefined },
+          { label: 'Total Amount', value: orderDetails.totalPrice ? formatMoney(orderDetails.totalPrice) : undefined },
+        ])}
+        ${
+          normalizedStatus === 'delivered' && dashboardLink
+            ? `<p style="margin:20px 0 0;"><a href="${escapeHtml(dashboardLink)}" style="display:inline-block;background:${BRAND.green};color:#ffffff;padding:11px 18px;text-decoration:none;border-radius:6px;font-weight:800;">View My Orders</a></p>`
+            : ''
+        }
+      `,
+      accent: copy.accent,
+    });
 
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #5B4B8A; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="color: white; margin: 0;">Citi-Nati Supermarket</h1>
-        </div>
-        <div style="padding: 30px; background-color: #f9f9f9;">
-          <h2 style="color: #333;">Order Update</h2>
-          <p style="color: #666;">Hi ${userName},</p>
-          <p style="color: #666; font-size: 16px; line-height: 1.6;">
-            ${isDelivered ? '✓ Your order has been successfully delivered!' : status?.toLowerCase().includes('cancelled') ? 'Your order has been cancelled.' : 'Your order is on its way!'}
-          </p>
-          <div style="background-color: #fff; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p style="color: #999; font-size: 12px; margin: 0;"><strong>Order ID:</strong> #${orderDetails.id}</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Status:</strong> ${status.toUpperCase()}</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Delivery Address:</strong> ${orderDetails.deliveryAddress || 'N/A'}</p>
-            ${orderDetails.totalPrice ? `<p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Total Amount:</strong> MWK ${orderDetails.totalPrice.toLocaleString()}</p>` : ''}
-          </div>
-          
-          ${isDelivered ? `
-            <div style="margin: 20px 0; padding: 15px; background-color: #e8f5e9; border-left: 4px solid #4caf50; border-radius: 4px;">
-              <p style="color: #2e7d32; font-size: 14px; margin: 0 0 10px 0;"><strong>📄 Download Your Receipt</strong></p>
-              <p style="color: #555; font-size: 13px; margin: 0 0 15px 0;">Go to your account dashboard to download your order receipt.</p>
-              <a href="${dashboardLink}" style="display: inline-block; background-color: #4caf50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">View My Orders</a>
-            </div>
-          ` : ''}
-          
-          <p style="color: #666; font-size: 14px;">
-            Thank you for choosing Citi-Nati Supermarket!
-          </p>
-        </div>
-        <div style="background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #999;">
-          <p style="margin: 0;">© 2026 Citi-Nati Supermarket. All rights reserved.</p>
-        </div>
-      </div>
-    `;
-
-    return await sendEmail(email, subject, html);
+    return await sendEmail(email, copy.subject, html);
   } catch (err) {
     logger.errorLog('Error in sendDeliveryStatusEmail', { error: err.message, email, orderId: orderDetails.id, status });
     return { success: false, error: err.message };
   }
 };
 
-/**
- * Send Refund Notification Email
- * Sent when payment is refunded due to order fulfillment failure
- */
 const sendRefundNotificationEmail = async (email, userName, refundDetails) => {
   try {
     logger.debugLog('Sending refund notification email', { email, orderId: refundDetails.orderId });
-
-    const formattedAmount = refundDetails.amount ? `MWK ${refundDetails.amount.toLocaleString()}` : 'N/A';
-    const refundId = refundDetails.refundId || 'Processing';
-
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #5B4B8A; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="color: white; margin: 0;">Citi-Nati Supermarket</h1>
-        </div>
-        <div style="padding: 30px; background-color: #f9f9f9;">
-          <h2 style="color: #d32f2f;">Order Refund Processed</h2>
-          <p style="color: #666;">Hi ${userName},</p>
-          <p style="color: #666; font-size: 16px; line-height: 1.6;">
-            Unfortunately, we were unable to complete your order after payment was processed. We have automatically refunded your payment.
-          </p>
-          
-          <div style="background-color: #ffebee; padding: 15px; border-left: 4px solid #d32f2f; border-radius: 4px; margin: 20px 0;">
-            <p style="color: #c62828; font-size: 14px; margin: 0 0 10px 0;"><strong>⚠️ Refund Details</strong></p>
-            <p style="color: #666; font-size: 13px; margin: 0 0 10px 0;">
-              <strong>Reason:</strong> ${refundDetails.reason || 'Product unavailable'}
-            </p>
-          </div>
-
-          <div style="background-color: #fff; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #e0e0e0;">
-            <p style="color: #999; font-size: 12px; margin: 0;"><strong>Order ID:</strong> #${refundDetails.orderId}</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Refund Amount:</strong> ${formattedAmount}</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Refund ID:</strong> ${refundId}</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Processed:</strong> ${refundDetails.timestamp ? new Date(refundDetails.timestamp).toLocaleString() : 'Today'}</p>
-          </div>
-
-          <div style="background-color: #e3f2fd; padding: 15px; border-left: 4px solid #1976d2; border-radius: 4px; margin: 20px 0;">
-            <p style="color: #0d47a1; font-size: 14px; margin: 0 0 10px 0;"><strong>ℹ️ What Happens Next</strong></p>
-            <ul style="color: #666; font-size: 13px; margin: 0; padding-left: 20px;">
-              <li style="margin: 5px 0;">The refund has been initiated with Paychangu</li>
-              <li style="margin: 5px 0;">Funds should appear in your account within 3-5 business days</li>
-              <li style="margin: 5px 0;">Please don't attempt to place the same order until stock is confirmed available</li>
-              <li style="margin: 5px 0;">Feel free to contact us if you have any questions</li>
-            </ul>
-          </div>
-
-          <p style="color: #666; font-size: 14px;">
-            We apologize for the inconvenience and appreciate your patience. We're constantly working to improve our inventory management to prevent this from happening in the future.
-          </p>
-
-          <p style="color: #666; font-size: 14px;">
-            Thank you for choosing Citi-Nati Supermarket!
-          </p>
-        </div>
-        <div style="background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #999;">
-          <p style="margin: 0;">© 2026 Citi-Nati Supermarket. All rights reserved.</p>
-          <p style="margin: 5px 0 0 0;">If you have questions, contact support.</p>
-        </div>
-      </div>
-    `;
+    const html = renderTemplate({
+      title: 'Order Refund Processed',
+      intro: `Hi ${escapeHtml(userName)}, we were unable to complete your order and have started the refund process.`,
+      body: `
+        ${renderInfoBox([
+          { label: 'Order Number', value: `#${refundDetails.orderId}` },
+          { label: 'Refund Amount', value: formatMoney(refundDetails.amount) },
+          { label: 'Refund ID', value: refundDetails.refundId || 'Processing' },
+          { label: 'Reason', value: refundDetails.reason || 'Order could not be completed' },
+          { label: 'Processed', value: refundDetails.timestamp ? new Date(refundDetails.timestamp).toLocaleString() : 'Today' },
+        ])}
+        <p style="color:${BRAND.muted};font-size:13px;line-height:1.6;">Funds should appear in your account within the payment provider timeline. Please contact support if you need help.</p>
+      `,
+      accent: BRAND.danger,
+    });
 
     return await sendEmail(email, 'Payment Refunded - Order #' + refundDetails.orderId, html);
   } catch (err) {
