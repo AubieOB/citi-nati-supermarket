@@ -20,19 +20,19 @@ const suppliersService = require('./suppliers.service');
 const payrollService = require('./payroll.service');
 const employeesService = require('./employees.service');
 
-const COMPANY_NAME = 'Citi-Nati Supermarket';
+const COMPANY_NAME = 'Citi-Nati';
 const COMPANY_CONTACT = process.env.EXPORT_COMPANY_CONTACT || 'Blantyre, Malawi';
 const MWK_FORMAT = '"MWK" #,##0.00';
-const EXCEL_BRAND_PURPLE = 'FF5B4B8A';
-const EXCEL_BRAND_GREEN = 'FF2D8659';
+const EXCEL_BRAND_PURPLE = 'FF005BEA';
+const EXCEL_BRAND_GREEN = 'FF00D620';
 const EXCEL_TEXT_DARK = 'FF0F172A';
 const EXCEL_TEXT_MUTED = 'FF64748B';
 const EXCEL_BG_LIGHT = 'FFF8FAFC';
 const EXCEL_BG_ALT = 'FFF6F8FC';
 const EXCEL_BORDER = 'FFE2E8F0';
-const PDF_BRAND_PURPLE = '#5B4B8A';
-const PDF_BRAND_GREEN = '#2D8659';
-const PDF_BRAND_ORANGE = '#B45309';
+const PDF_BRAND_PURPLE = '#005BEA';
+const PDF_BRAND_GREEN = '#00D620';
+const PDF_BRAND_ORANGE = '#005BEA';
 const PDF_SLATE = '#111827';
 const PDF_MUTED = '#6B7280';
 
@@ -63,6 +63,8 @@ function sanitizeFilePart(value) {
 function logoPathCandidates() {
   return [
     process.env.EXPORT_LOGO_PATH,
+    path.resolve(__dirname, '../../../../citi-nati-frontend/src/assets/citi-nati-full-logo.original.png'),
+    path.resolve(process.cwd(), 'citi-nati-frontend/src/assets/citi-nati-full-logo.original.png'),
     path.resolve(__dirname, '../../../../citi-nati-frontend/src/assets/citi-nati-logo.png.png'),
     path.resolve(__dirname, '../../../../citi-nati-frontend/src/assets/citi-nati-logo.png'),
     path.resolve(process.cwd(), 'citi-nati-frontend/src/assets/citi-nati-logo.png.png'),
@@ -410,60 +412,94 @@ function buildAppliedFilterText(filters = {}) {
 function createPdfContext(report) {
   return {
     title: report.title,
-    subtitle: `${titleCase(report.module)} • ${titleCase(report.type || 'summary')}`,
+    subtitle: `${titleCase(report.module)} - ${titleCase(report.type || 'summary')}`,
     periodText: getReportPeriodText(report),
     generatedText: formatBusinessDateTimeLabel(new Date()),
   };
+}
+
+function getPdfLayout(report) {
+  if (report.module === 'employees') {
+    return { size: 'A3', layout: 'landscape', margin: 36 };
+  }
+
+  if (['expenses', 'suppliers', 'payroll'].includes(report.module)) {
+    return { size: 'A4', layout: 'landscape', margin: 34 };
+  }
+
+  return { size: 'A4', layout: 'portrait', margin: 36 };
 }
 
 function drawPdfHeader(doc, context) {
   const margin = doc.page.margins.left;
   const pageWidth = doc.page.width;
   const logoPath = resolveLogoPath();
-
-  doc.y = 34;
+  let y = 22;
 
   if (logoPath) {
-    doc.image(logoPath, margin, 28, { fit: [42, 42], align: 'left' });
+    doc.image(logoPath, (pageWidth - 260) / 2, y, { fit: [260, 34], align: 'center' });
+    y += 44;
+  } else {
+    doc.font('Helvetica-Bold').fontSize(22).fillColor(PDF_BRAND_PURPLE)
+      .text(COMPANY_NAME, margin, y, { width: pageWidth - (margin * 2), align: 'center' });
+    y += 32;
   }
-
-  doc.font('Helvetica-Bold').fontSize(20);
-  const brandLeft = 'Citi';
-  const brandRight = '- Nati Supermarket';
-  const leftWidth = doc.widthOfString(brandLeft);
-  const rightWidth = doc.widthOfString(brandRight);
-  const totalWidth = leftWidth + rightWidth + 3;
-  const brandX = (pageWidth / 2) - (totalWidth / 2);
-
-  doc.fillColor(PDF_BRAND_PURPLE).text(brandLeft, brandX, 34, { lineBreak: false });
-  doc.fillColor(PDF_BRAND_GREEN).text(brandRight, brandX + leftWidth + 3, 34, { lineBreak: false });
 
   doc
     .fillColor(PDF_SLATE)
     .font('Helvetica-Bold')
-    .fontSize(13)
-    .text(context.title, margin, 58, { width: pageWidth - (margin * 2), align: 'center' })
+    .fontSize(15)
+    .text(context.title, margin, y, { width: pageWidth - (margin * 2), align: 'center' })
     .font('Helvetica')
-    .fontSize(9.5)
+    .fontSize(10)
     .fillColor(PDF_MUTED)
-    .text(context.subtitle, margin, 74, { width: pageWidth - (margin * 2), align: 'center' })
-    .text(`Period: ${context.periodText}`, margin, 88, { width: 220, align: 'left' })
-    .text(`Generated: ${context.generatedText}`, pageWidth - margin - 220, 88, { width: 220, align: 'right' })
-    .text(COMPANY_CONTACT, margin, 102, { width: pageWidth - (margin * 2), align: 'center' });
+    .text(context.subtitle, margin, y + 18, { width: pageWidth - (margin * 2), align: 'center' })
+    .text(`Period: ${context.periodText}`, margin, y + 35, { width: 300, align: 'left' })
+    .text(`Generated: ${context.generatedText}`, pageWidth - margin - 300, y + 35, { width: 300, align: 'right' })
+    .text(COMPANY_CONTACT, margin, y + 50, { width: pageWidth - (margin * 2), align: 'center' });
 
   doc
-    .moveTo(margin, 118)
-    .lineTo(pageWidth - margin, 118)
-    .lineWidth(1.5)
+    .moveTo(margin, y + 66)
+    .lineTo(pageWidth - margin, y + 66)
+    .lineWidth(1.6)
     .strokeColor(PDF_BRAND_GREEN)
     .stroke();
 
-  doc.y = 130;
+  doc.y = y + 80;
+}
+
+function drawPdfContinuationHeader(doc, context) {
+  const margin = doc.page.margins.left;
+  const width = doc.page.width - (margin * 2);
+  const y = 24;
+
+  doc
+    .fillColor(PDF_SLATE)
+    .font('Helvetica-Bold')
+    .fontSize(11)
+    .text(context.title, margin, y, { width: width * 0.62, ellipsis: true })
+    .fillColor(PDF_MUTED)
+    .font('Helvetica')
+    .fontSize(8)
+    .text(`Period: ${context.periodText}`, margin + (width * 0.62), y + 2, {
+      width: width * 0.38,
+      align: 'right',
+      ellipsis: true,
+    });
+
+  doc
+    .moveTo(margin, y + 19)
+    .lineTo(doc.page.width - margin, y + 19)
+    .lineWidth(1)
+    .strokeColor(PDF_BRAND_GREEN)
+    .stroke();
+
+  doc.y = y + 31;
 }
 
 function addPdfPage(doc, context) {
   doc.addPage();
-  drawPdfHeader(doc, context);
+  drawPdfContinuationHeader(doc, context);
 }
 
 function ensurePdfSpace(doc, neededHeight, context) {
@@ -695,7 +731,7 @@ async function buildExpensesReport(type, filters = {}) {
   };
 
   const includeList = type === 'list' || type === 'all';
-  const includeSummary = type === 'summary' || type === 'all';
+  const includeSummary = type === 'summary' || type === 'list' || type === 'all';
   const includeCategories = type === 'category-summary' || type === 'all';
 
   const data = { expenses: [], summary: null, categories: [] };
@@ -1375,7 +1411,15 @@ async function buildExcelBuffer(report) {
 
 async function buildPdfBuffer(report) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true, compress: true, pdfVersion: '1.7' });
+    const pdfLayout = getPdfLayout(report);
+    const doc = new PDFDocument({
+      margin: pdfLayout.margin,
+      size: pdfLayout.size,
+      layout: pdfLayout.layout,
+      bufferPages: true,
+      compress: true,
+      pdfVersion: '1.7',
+    });
     const chunks = [];
     const context = createPdfContext(report);
 
@@ -1515,6 +1559,10 @@ async function buildPdfBuffer(report) {
           description: row.description || '-',
           amount: formatCurrencyDisplay(row.amount),
         })), context);
+      }
+
+      if (!report.data.expenses.length && !Number(report.data.summary?.totals?.totalExpenses || 0)) {
+        drawPdfNoDataMessage(doc, 'No expenses matched this period/filter selection.', context);
       }
     }
 
@@ -1683,13 +1731,37 @@ async function buildPdfBuffer(report) {
       }
     }
 
-    doc
-      .fontSize(8)
-      .fillColor(PDF_MUTED)
-      .text('Automated report generated by Citi-Nati Supermarket Business Operations', doc.page.margins.left, doc.page.height - 32, {
-        width: doc.page.width - (doc.page.margins.left * 2),
-        align: 'center',
-      });
+    const pageRange = doc.bufferedPageRange();
+    for (let pageIndex = pageRange.start; pageIndex < pageRange.start + pageRange.count; pageIndex += 1) {
+      doc.switchToPage(pageIndex);
+      const margin = doc.page.margins.left;
+      const originalBottomMargin = doc.page.margins.bottom;
+      doc.page.margins.bottom = 0;
+      const footerY = doc.page.height - 20;
+      const footerWidth = doc.page.width - (margin * 2);
+
+      doc
+        .moveTo(margin, footerY - 7)
+        .lineTo(doc.page.width - margin, footerY - 7)
+        .lineWidth(0.5)
+        .strokeColor('#E5E7EB')
+        .stroke()
+        .font('Helvetica')
+        .fontSize(7.5)
+        .fillColor(PDF_MUTED)
+        .text('Automated report generated by Citi-Nati Business Operations', margin, footerY, {
+          width: footerWidth * 0.78,
+          align: 'left',
+          lineBreak: false,
+        })
+        .text(`Page ${pageIndex - pageRange.start + 1} of ${pageRange.count}`, margin + (footerWidth * 0.78), footerY, {
+          width: footerWidth * 0.22,
+          align: 'right',
+          lineBreak: false,
+        });
+
+      doc.page.margins.bottom = originalBottomMargin;
+    }
 
     doc.end();
   });
