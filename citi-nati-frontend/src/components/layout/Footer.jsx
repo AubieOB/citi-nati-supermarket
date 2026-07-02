@@ -34,6 +34,7 @@ const Footer = () => {
             <Link to="/returns" className="footer__link">Returns</Link>
             <Link to="/faqs" className="footer__link">FAQs</Link>
             <Link to="/contact" className="footer__link">Contact</Link>
+            <Link to="/terms" className="footer__link">Terms & Conditions</Link>
           </div>
         </div>
 
@@ -63,9 +64,7 @@ const Footer = () => {
         <p className="footer__copyright">
           &copy; {new Date().getFullYear()} Citi-Nati Supermarket. All rights reserved.
         </p>
-        <div className="footer__legal-links">
-          <Link to="/terms" className="footer__legal-link">Terms & Conditions</Link>
-        </div>
+        <p className="footer__powered-by">Powered by AubieOB Digital Solutions</p>
       </div>
     </footer>
   );
