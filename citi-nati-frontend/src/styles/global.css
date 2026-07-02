@@ -812,7 +812,16 @@ body.menu-open {
 .footer__powered-by img {
   display: inline-block;
   width: auto;
-  height: 28px;
+  height: 40px;
+}
+
+@media (max-width: 480px) {
+  .footer__powered-by img {
+    height: 28px;
+  }
+  .footer__powered-by {
+    gap: 0.5rem;
+  }
 }
 
 
