@@ -64,7 +64,10 @@ const Footer = () => {
         <p className="footer__copyright">
           &copy; {new Date().getFullYear()} Citi-Nati Supermarket. All rights reserved.
         </p>
-        <p className="footer__powered-by">Powered by AubieOB Digital Solutions</p>
+        <div className="footer__powered-by">
+          <img src="/aubieob-logo.png" alt="AubieOB Digital Solutions logo" />
+          <span>Powered by AubieOB Digital Solutions</span>
+        </div>
       </div>
     </footer>
   );

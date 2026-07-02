@@ -800,6 +800,22 @@ body.menu-open {
   color: #bdc3c7;
 }
 
+.footer__powered-by {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  color: #bdc3c7;
+}
+
+.footer__powered-by img {
+  display: inline-block;
+  width: auto;
+  height: 28px;
+}
+
+
 /* Responsive Footer */
 @media (max-width: 768px) {
   .footer__content {
