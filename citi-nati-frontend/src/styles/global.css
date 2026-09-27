@@ -4604,19 +4604,16 @@ h6 {
   align-items: center;
   justify-content: flex-end;
   gap: 1.25rem;
-  flex-shrink: 0;
-  overflow: visible;
 }
 
 .header__info-item {
-  min-width: 160px;
   display: flex;
   align-items: center;
   gap: 0.72rem;
   padding-left: 1.25rem;
   border-left: 1px solid #e5eaf1;
   color: #26364d;
-  flex-shrink: 0;
+  min-width: auto;
 }
 
 .header__info-item:first-child {
