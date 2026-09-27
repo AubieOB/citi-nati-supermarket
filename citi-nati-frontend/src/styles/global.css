@@ -4630,7 +4630,7 @@ h6 {
   gap: 0.05rem;
   font-size: 0.86rem;
   line-height: 1.2;
-  white-space: nowrap;
+  word-break: break-word;
 }
 
 .header__info-item strong {
