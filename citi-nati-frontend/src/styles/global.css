@@ -4989,21 +4989,29 @@ h6 {
 /* Collapse header top on mobile when scrolled - show logo only */
 @media (max-width: 900px) {
   .header--scrolled .header__top {
+    height: auto;
+    overflow: visible;
     padding: 0 !important;
   }
 
   .header--scrolled .header__top-inner {
-    min-height: auto;
-    padding-top: 0.4rem !important;
-    padding-bottom: 0.4rem !important;
+    min-height: 0;
+    height: auto;
+    padding: 0 !important;
+    gap: 0;
   }
 
   .header--scrolled .header__top-inner > *:not(.header__logo) {
-    display: none;
+    display: none !important;
   }
 
   .header--scrolled .header__logo {
-    min-width: auto;
+    min-width: 0;
+    padding: 0 !important;
+  }
+
+  .header--scrolled .header__logo img {
+    display: block;
   }
 }
 
