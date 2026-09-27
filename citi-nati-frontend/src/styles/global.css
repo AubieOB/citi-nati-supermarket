@@ -4986,12 +4986,24 @@ h6 {
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
 }
 
-/* Collapse header top on mobile when scrolled */
+/* Collapse header top on mobile when scrolled - show logo only */
 @media (max-width: 900px) {
   .header--scrolled .header__top {
-    height: 0;
-    overflow: hidden;
     padding: 0 !important;
+  }
+
+  .header--scrolled .header__top-inner {
+    min-height: auto;
+    padding-top: 0.4rem !important;
+    padding-bottom: 0.4rem !important;
+  }
+
+  .header--scrolled .header__top-inner > *:not(.header__logo) {
+    display: none;
+  }
+
+  .header--scrolled .header__logo {
+    min-width: auto;
   }
 }
 
