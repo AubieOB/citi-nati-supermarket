@@ -4986,6 +4986,15 @@ h6 {
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
 }
 
+/* Collapse header top on mobile when scrolled */
+@media (max-width: 900px) {
+  .header--scrolled .header__top {
+    height: 0;
+    overflow: hidden;
+    padding: 0 !important;
+  }
+}
+
 .home-page .hero__eyebrow {
   display: none;
 }
