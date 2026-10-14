@@ -23,6 +23,8 @@ async function verify() {
   try {
     assert.throws(() => createStore({ enabled: false }));
     assert.throws(() => createClient({ baseUrl: 'http://example.invalid', credential: config.credential, localTest: true }));
+    assert.throws(() => createStore({ ...config, existingDevelopmentTenantConfirmed: true }));
+    assert.throws(() => createStore({ ...config, testTenantConfirmed: false, existingDevelopmentTenantConfirmed: true, tenantName: 'Existing test workspace', baseUrl: 'https://example.invalid' }));
     await start(); assert.equal(server.address().address, '127.0.0.1');
     assert.throws(() => createStore(config));
     assert.equal((await request('/')).status, 401);
@@ -30,6 +32,7 @@ async function verify() {
     assert.equal((await request('/', { ...auth, Host: 'wrong.invalid' })).status, 403);
     const page = await request('/', auth);
     assert.equal(page.status, 200); assert.ok(page.headers['content-security-policy']);
+    assert.equal(JSON.parse((await request('/api/erp-test/context', auth)).body).kind, 'ISOLATED_TEST_TENANT');
     assert.ok(!page.body.includes(config.credential));
     for (const route of ['/store.js', '/store.css', '/brand.css', '/brand-logo.png']) assert.equal((await request(route, auth)).status, 200);
     const id = 'runtime-' + randomUUID(), timestamp = String(Math.floor(Date.now() / 1000));
@@ -48,6 +51,9 @@ async function verify() {
     const changed = JSON.stringify({ id, type: 'connection.test', data: { reference: 'different' } });
     const changedHeaders = { ...headers, 'x-aubieone-signature': 'sha256=' + createHmac('sha256', config.signingSecret).update(timestamp + '.').update(changed).digest('hex') };
     assert.equal((await request('/api/erp-test/notifications', changedHeaders, changed)).status, 409);
+    await stop(); config.testTenantConfirmed = false; config.existingDevelopmentTenantConfirmed = true; config.tenantName = "Chrissie's Boutique";
+    await start(); const context = JSON.parse((await request('/api/erp-test/context', auth)).body);
+    assert.equal(context.kind, 'EXISTING_DEVELOPMENT_TENANT'); assert.equal(context.tenantName, "Chrissie's Boutique");
     console.log(JSON.stringify({ success: true, node: process.version, platform: process.platform,
       checks: ['disabled startup and transport boundary', 'loopback, operator authentication and static assets', 'signed durable notification retry after restart', 'exclusive journal ownership and private file permissions'],
       erpRequests: 0, websiteDatabaseAccess: false, liveWebsiteMutation: false, evidenceDirectory: dataDir }));

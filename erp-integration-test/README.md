@@ -61,6 +61,8 @@ The server binds only `127.0.0.1`, default port 5081. The operator credentials p
 
 HTTP ERP transport is restricted to loopback with NODE_ENV=test. Remote ERP access requires HTTPS and explicit test-tenant confirmation. The latter is an operator approval marker, not automatic proof that a remote tenant is non-production; independently verify its identity before enabling any requests.
 
+An explicitly user-approved **existing local development tenant** can instead use `CITI_ERP_TEST_TENANT_CONFIRMED=EXISTING_DEVELOPMENT_TENANT_TEST` and its actual `ERP_TEST_TENANT_NAME`. This mode permits only private loopback HTTP in test mode, including an SSH reverse tunnel, and rejects public origins and remote ERP addresses. The page identifies that sample orders enter the existing development workspace. It is not an isolated-tenant claim or permission to access a production ERP database. Existing administrator authentication, workstation activation, permissions, stock and Finance controls remain mandatory.
+
 ## VPS deployment boundary
 
 Prepare a separate checkout/directory, service, private journal and HTTPS test subdomain such as `erp-test.citinati.com`. Deploy the reviewed feature branch there. Keep the existing `citinati.com` document root, service, database, env files and default branch unchanged. Do not run the normal website `npm start` during this test setup: that script automatically applies Prisma migrations and the main server starts database maintenance, mail and POS-related workflows.

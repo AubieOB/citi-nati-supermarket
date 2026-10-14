@@ -6,7 +6,9 @@ const { createClient, IntegrationError } = require('./client.cjs');
 const digest = value => createHash('sha256').update(value).digest('hex');
 function same(a, b) { const x = Buffer.from(a || ''), y = Buffer.from(b || ''); return x.length === y.length && timingSafeEqual(x, y); }
 function createStore(config) {
-  if (config.enabled !== true || config.testTenantConfirmed !== true) throw new Error('Enable only for an explicitly approved isolated test ERP tenant.');
+  const isolated = config.testTenantConfirmed === true, existing = config.existingDevelopmentTenantConfirmed === true;
+  if (config.enabled !== true || isolated === existing) throw new Error('Confirm exactly one approved ERP test context before enabling this store.');
+  if (existing) { const target = new URL(config.baseUrl); if (!config.localTest || config.siteOrigin || target.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(target.hostname) || !config.tenantName || config.tenantName.length > 200) throw new Error('An existing development tenant requires explicit identity and private loopback transport.'); }
   if (!config.password || config.password.length < 16 || !config.signingSecret || config.signingSecret.length < 32) throw new Error('Set separate operator and notification secrets.');
   if (config.siteOrigin) { const origin = new URL(config.siteOrigin); if (origin.username || origin.password || origin.search || origin.hash || origin.pathname !== '/' || origin.protocol !== 'https:') throw new Error('Configure the exact HTTPS test website origin.'); }
   const client = createClient(config), dir = path.resolve(config.dataDir || path.join(__dirname, 'data'));
@@ -42,6 +44,7 @@ function createStore(config) {
       }
       const auth = 'Basic ' + Buffer.from((config.username || 'tester') + ':' + config.password).toString('base64');
       if (!same(req.headers.authorization, auth)) { res.setHeader('WWW-Authenticate', 'Basic realm="Citi-Nati isolated ERP test", charset="UTF-8"'); return json(res, 401, { message: 'Sign in with the test operator account.' }); }
+      if (route === '/api/erp-test/context' && req.method === 'GET') return json(res, 200, { kind: existing ? 'EXISTING_DEVELOPMENT_TENANT' : 'ISOLATED_TEST_TENANT', tenantName: config.tenantName || null });
       if (req.method === 'GET' && staticFiles[route]) { const [name, type] = staticFiles[route]; res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' }); return res.end(fs.readFileSync(path.resolve(__dirname, name))); }
       if (route === '/api/erp-test/catalog' && req.method === 'GET') return json(res, 200, await client.catalog());
       if (route === '/api/erp-test/connect' && req.method === 'POST') { const body = await object(req); if (Object.keys(body).length !== 1 || !/^[A-Za-z0-9_-]{43}$/.test(body.challenge || '')) throw new IntegrationError(400, 'Enter the issued connection challenge.'); return json(res, 200, await client.prove(body.challenge)); }
@@ -67,7 +70,7 @@ function createStore(config) {
 function start() {
   const env = process.env;
   const port = Number(env.CITI_ERP_TEST_PORT || 5081); if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Choose an unused test port between 1024 and 65535.');
-  const server = createStore({ enabled: env.CITI_ERP_TEST_ENABLED === 'true', testTenantConfirmed: env.CITI_ERP_TEST_TENANT_CONFIRMED === 'ISOLATED_TEST_ONLY', baseUrl: env.ERP_TEST_BASE_URL, credential: env.ERP_TEST_CREDENTIAL, signingSecret: env.ERP_TEST_SIGNING_SECRET, username: env.ERP_TEST_OPERATOR, password: env.ERP_TEST_OPERATOR_PASSWORD, siteOrigin: env.CITI_ERP_TEST_ORIGIN, localTest: env.NODE_ENV === 'test', dataDir: env.CITI_ERP_TEST_DATA_DIR });
+  const server = createStore({ enabled: env.CITI_ERP_TEST_ENABLED === 'true', testTenantConfirmed: env.CITI_ERP_TEST_TENANT_CONFIRMED === 'ISOLATED_TEST_ONLY', existingDevelopmentTenantConfirmed: env.CITI_ERP_TEST_TENANT_CONFIRMED === 'EXISTING_DEVELOPMENT_TENANT_TEST', tenantName: env.ERP_TEST_TENANT_NAME, baseUrl: env.ERP_TEST_BASE_URL, credential: env.ERP_TEST_CREDENTIAL, signingSecret: env.ERP_TEST_SIGNING_SECRET, username: env.ERP_TEST_OPERATOR, password: env.ERP_TEST_OPERATOR_PASSWORD, siteOrigin: env.CITI_ERP_TEST_ORIGIN, localTest: env.NODE_ENV === 'test', dataDir: env.CITI_ERP_TEST_DATA_DIR });
   server.listen(port, '127.0.0.1', () => console.log('Citi-Nati isolated test store listening on loopback port ' + port));
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => server.close());
 }

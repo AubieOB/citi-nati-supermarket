@@ -32,4 +32,4 @@ node('checkout').addEventListener('submit', e => { e.preventDefault(); work(node
   const result = await request('orders', pending); displayOrder(result); message('Test order received by ERP. Payment remains subject to Finance evidence.'); node('submit').textContent = 'Retry Same Test Order';
 }); });
 node('refresh-order').addEventListener('click', () => work(node('refresh-order'), async () => { if (!pending) throw new Error('Submit a test order first.'); displayOrder(await request('orders/' + pending.key)); message('Current ERP status loaded.'); }));
-work(node('reload'), reload);
+work(node('reload'), async () => { const context = await request('context'); node('test-context').textContent = context.kind === 'EXISTING_DEVELOPMENT_TENANT' ? 'Sample orders will appear in the existing ' + context.tenantName + ' development workspace.' : 'Sample orders go to an isolated ERP test tenant.'; await reload(); });

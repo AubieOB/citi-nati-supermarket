@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Citi-Nati — Isolated ERP Test Store</title><link rel="stylesheet" href="/brand.css"><link rel="stylesheet" href="/store.css"><script src="/store.js" defer></script></head><body>
 <header class="test-header"><img src="/brand-logo.png" alt="Citi-Nati Supermarket"><span>Isolated test store</span></header>
-<main><section class="test-intro"><h1>Test your website connection</h1><p>Sample orders go to the configured test ERP tenant. This store does not use Citi-Nati’s live checkout, customers, payments or POS.</p></section>
+<main><section class="test-intro"><h1>Test your website connection</h1><p id="test-context">Confirming the ERP test workspace…</p><p>This separate store does not use Citi-Nati’s live checkout, customers, payments or POS.</p></section>
 <p id="message" role="status" aria-live="polite"></p>
 <details><summary>Connection setup</summary><form id="connection"><label>Connection challenge<input id="challenge" maxlength="43" required autocomplete="off"></label><button>Confirm Connection</button></form><p>Generate a challenge in ERP Websites, confirm it here, then activate that connection in ERP.</p></details>
 <section><div class="section-heading"><h2>Published test products</h2><button id="reload" type="button">Refresh Products</button></div><p id="pricing"></p><div id="products" class="test-products"></div></section>
