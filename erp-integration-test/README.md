@@ -32,6 +32,16 @@ The harness independently verifies its previously approved local configuration, 
 
 No secrets are printed. The harness uses ephemeral scoped ERP credentials and a synthetic test-operator account, and disables the test channel when finished. Source hashes, assertions and the rendered website screenshot are retained under that run's `citi-site` directory.
 
+The captured-source integration run `financial_authority_1791985544692` passed 73 combined checks, including 20 ERP Electron cases and one additional Citi browser case, with zero failures. It created two synthetic unpaid orders. These counts cover the captured ERP/site source, not later unrelated workspace edits or the original Citi customer checkout.
+
+For an independent runtime check on a separate checkout, use:
+
+```text
+node erp-integration-test/verify-runtime.cjs
+```
+
+This probe uses built-in Node modules, ephemeral loopback listeners and a new temporary evidence directory. It checks disabled startup, authentication, branding assets, signed notification persistence/retry after restart and exclusive private journal ownership. It makes zero ERP requests and never reads site configuration, databases, PM2 or Nginx. On Linux it also verifies private journal-file permissions. Successful runtime verification is not an end-to-end ERP or public HTTPS test.
+
 ## Standalone configuration
 
 Use a supported Node runtime with built-in fetch and AbortSignal.timeout; local verification uses Node 24. Copy `.env.example` to `.env.local` in this folder, which is ignored by Git. Explicitly confirm the approved **isolated test ERP tenant**, enable the test store, and configure its separate website credential, signing secret and operator password. Do not copy the original site's `.env` or production credentials.
